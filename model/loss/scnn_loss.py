@@ -8,7 +8,7 @@ class SCNNLoss(nn.Module):
 
     Combines:
         1. CrossEntropyLoss for segmentation (with background weight reduction)
-        2. BCELoss for lane existence prediction
+        2. BCEWithLogitsLoss for lane existence prediction (numerically stable)
 
     Total loss = seg_loss * seg_weight + exist_loss * exist_weight
     """
@@ -22,13 +22,15 @@ class SCNNLoss(nn.Module):
         # Background class (0) weighted less since it dominates the image
         class_weights = torch.tensor([background_weight, 1.0, 1.0, 1.0, 1.0])
         self.seg_loss = nn.CrossEntropyLoss(weight=class_weights)
-        self.exist_loss = nn.BCELoss()
+
+        # BCEWithLogitsLoss is more numerically stable than Sigmoid + BCELoss
+        self.exist_loss = nn.BCEWithLogitsLoss()
 
     def forward(self, seg_pred, exist_pred, seg_gt, exist_gt):
         """
         Args:
             seg_pred: Segmentation logits of shape (B, 5, H, W)
-            exist_pred: Existence probabilities of shape (B, 4)
+            exist_pred: Existence logits of shape (B, 4)
             seg_gt: Segmentation ground truth of shape (B, H, W)
             exist_gt: Existence ground truth of shape (B, 4)
 

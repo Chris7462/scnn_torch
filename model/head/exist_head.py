@@ -8,10 +8,10 @@ class ExistHead(nn.Module):
     Predicts whether each lane exists in the image.
 
     Architecture:
-        Softmax → AvgPool(2x2) → Flatten → FC(N→128) → ReLU → FC(128→4) → Sigmoid
+        Softmax → AvgPool(2x2) → Flatten → FC(N→128) → ReLU → FC(128→4)
 
     Output:
-        4 probabilities, one for each lane
+        4 logits, one for each lane (use BCEWithLogitsLoss for training)
     """
 
     def __init__(self, in_channels=5, input_height=36, input_width=100, num_lanes=4):
@@ -31,7 +31,6 @@ class ExistHead(nn.Module):
             nn.Linear(fc_input_features, 128),
             nn.ReLU(inplace=True),
             nn.Linear(128, num_lanes),
-            nn.Sigmoid(),
         )
 
     def forward(self, x):
@@ -40,7 +39,7 @@ class ExistHead(nn.Module):
             x: Input tensor of shape (B, 5, H, W) - segmentation logits before upsampling
 
         Returns:
-            Existence probabilities of shape (B, 4)
+            Existence logits of shape (B, 4)
         """
         x = self.pool(x)
         x = x.view(x.size(0), -1)

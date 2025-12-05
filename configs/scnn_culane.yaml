@@ -1,0 +1,64 @@
+# SCNN Configuration for CULane Dataset
+
+# Model
+model:
+  input_size: [800, 288]  # [width, height]
+  ms_ks: 9                # Message passing kernel size
+  pretrained: true
+
+# Dataset
+dataset:
+  root: data/CULane
+  resize_shape: [800, 288]  # [width, height]
+
+# Dataloader
+dataloader:
+  batch_size: 8
+  num_workers: 4
+
+# Training
+train:
+  epochs: 30
+  rotation: 2  # Rotation augmentation angle
+
+# Optimizer
+optimizer:
+  type: SGD
+  lr: 0.16
+  momentum: 0.9
+  weight_decay: 0.001
+  nesterov: true
+
+# Learning rate scheduler
+lr_scheduler:
+  type: PolyLR
+  power: 0.9
+  warmup: 50
+  max_iter: 8000
+
+# Loss
+loss:
+  seg_weight: 1.0
+  exist_weight: 0.1
+  background_weight: 0.4
+
+# Normalization (ImageNet)
+normalize:
+  mean: [0.485, 0.456, 0.406]
+  std: [0.229, 0.224, 0.225]
+
+# Checkpoints
+checkpoint:
+  save_dir: checkpoints
+  save_interval: 1  # Save every N epochs
+
+# Logging
+logging:
+  print_interval: 20  # Print every N iterations
+
+# Evaluation
+evaluation:
+  iou_threshold: 0.5
+  lane_width: 30
+  im_width: 1640
+  im_height: 590

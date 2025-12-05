@@ -1,0 +1,194 @@
+import argparse
+
+import torch
+import torch.optim as optim
+from torch.utils.data import DataLoader
+import yaml
+
+from datasets import CULane
+from datasets.transforms import Compose, Resize, Rotation, ToTensor, Normalize
+from model import SCNN
+from model.loss import SCNNLoss
+from engine import Trainer, PolyLR
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description='Train SCNN for lane detection')
+    parser.add_argument('--config', type=str, default='configs/scnn_culane.yaml',
+                        help='Path to config file')
+    parser.add_argument('--resume', type=str, default=None,
+                        help='Path to checkpoint to resume from')
+    return parser.parse_args()
+
+
+def load_config(config_path):
+    """Load configuration from YAML file."""
+    with open(config_path, 'r') as f:
+        config = yaml.safe_load(f)
+    return config
+
+
+def build_transforms(config, is_train=True):
+    """Build transforms for training or validation."""
+    resize_shape = tuple(config['dataset']['resize_shape'])
+    mean = tuple(config['normalize']['mean'])
+    std = tuple(config['normalize']['std'])
+
+    if is_train:
+        rotation = config['train']['rotation']
+        return Compose(
+            Resize(resize_shape),
+            Rotation(rotation),
+            ToTensor(),
+            Normalize(mean=mean, std=std),
+        )
+    else:
+        return Compose(
+            Resize(resize_shape),
+            ToTensor(),
+            Normalize(mean=mean, std=std),
+        )
+
+
+def build_dataloader(config, image_set, transforms):
+    """Build dataloader for given image set."""
+    dataset = CULane(
+        root=config['dataset']['root'],
+        image_set=image_set,
+        transforms=transforms,
+    )
+
+    dataloader = DataLoader(
+        dataset,
+        batch_size=config['dataloader']['batch_size'],
+        shuffle=(image_set == 'train'),
+        num_workers=config['dataloader']['num_workers'],
+        collate_fn=dataset.collate,
+        pin_memory=True,
+        drop_last=(image_set == 'train'),
+    )
+
+    return dataloader
+
+
+def build_model(config, device):
+    """Build SCNN model."""
+    input_size = tuple(config['model']['input_size'])
+    ms_ks = config['model']['ms_ks']
+    pretrained = config['model']['pretrained']
+
+    model = SCNN(input_size=input_size, ms_ks=ms_ks, pretrained=pretrained)
+    model = model.to(device)
+
+    # Use DataParallel if multiple GPUs available
+    if torch.cuda.device_count() > 1:
+        print(f"Using {torch.cuda.device_count()} GPUs")
+        model = torch.nn.DataParallel(model)
+
+    return model
+
+
+def build_optimizer(config, model):
+    """Build optimizer."""
+    optimizer_cfg = config['optimizer']
+
+    optimizer = optim.SGD(
+        model.parameters(),
+        lr=optimizer_cfg['lr'],
+        momentum=optimizer_cfg['momentum'],
+        weight_decay=optimizer_cfg['weight_decay'],
+        nesterov=optimizer_cfg['nesterov'],
+    )
+
+    return optimizer
+
+
+def build_lr_scheduler(config, optimizer, steps_per_epoch):
+    """Build learning rate scheduler."""
+    scheduler_cfg = config['lr_scheduler']
+
+    # Calculate max_iter if not specified
+    max_iter = scheduler_cfg.get('max_iter', config['train']['epochs'] * steps_per_epoch)
+
+    scheduler = PolyLR(
+        optimizer,
+        power=scheduler_cfg['power'],
+        max_iter=max_iter,
+        warmup=scheduler_cfg['warmup'],
+    )
+
+    return scheduler
+
+
+def build_criterion(config, device):
+    """Build loss function."""
+    loss_cfg = config['loss']
+
+    criterion = SCNNLoss(
+        seg_weight=loss_cfg['seg_weight'],
+        exist_weight=loss_cfg['exist_weight'],
+        background_weight=loss_cfg['background_weight'],
+    )
+    criterion = criterion.to(device)
+
+    return criterion
+
+
+def main():
+    args = parse_args()
+
+    # Load config
+    config = load_config(args.config)
+    print(f"Loaded config from {args.config}")
+
+    # Device
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print(f"Using device: {device}")
+
+    # Build transforms
+    train_transforms = build_transforms(config, is_train=True)
+    val_transforms = build_transforms(config, is_train=False)
+
+    # Build dataloaders
+    print("Building dataloaders...")
+    train_loader = build_dataloader(config, 'train', train_transforms)
+    val_loader = build_dataloader(config, 'val', val_transforms)
+    print(f"  Train: {len(train_loader.dataset)} samples, {len(train_loader)} batches")
+    print(f"  Val: {len(val_loader.dataset)} samples, {len(val_loader)} batches")
+
+    # Build model
+    print("Building model...")
+    model = build_model(config, device)
+
+    # Build optimizer
+    optimizer = build_optimizer(config, model)
+
+    # Build lr scheduler
+    lr_scheduler = build_lr_scheduler(config, optimizer, len(train_loader))
+
+    # Build criterion
+    criterion = build_criterion(config, device)
+
+    # Build trainer
+    trainer = Trainer(
+        model=model,
+        train_loader=train_loader,
+        val_loader=val_loader,
+        criterion=criterion,
+        optimizer=optimizer,
+        lr_scheduler=lr_scheduler,
+        config=config,
+        device=device,
+    )
+
+    # Resume from checkpoint if specified
+    if args.resume:
+        trainer.load_checkpoint(args.resume)
+
+    # Train
+    print("\nStarting training...")
+    trainer.train()
+
+
+if __name__ == '__main__':
+    main()

@@ -3,6 +3,7 @@ import time
 
 import torch
 import torch.nn as nn
+from tqdm import tqdm
 
 from utils.tensorboard import TensorBoard
 from utils.visualization import prepare_visualization_batch
@@ -68,15 +69,14 @@ class Trainer:
     def train(self):
         """Main training loop over all epochs."""
         for epoch in range(self.start_epoch, self.epochs):
-            print(f"\nEpoch {epoch}/{self.epochs - 1}")
-            print("-" * 40)
+            print(f"\nTrain Epoch: {epoch}")
 
             # Train one epoch
             self.train_one_epoch(epoch)
 
             # Validate
             if self.val_loader is not None:
-                print(f"\nValidation at epoch {epoch}")
+                print(f"\nValidation For Experiment: {self.save_dir}")
                 print(time.strftime('%H:%M:%S', time.localtime()))
                 self.validate(epoch)
 
@@ -84,8 +84,10 @@ class Trainer:
             if (epoch + 1) % self.save_interval == 0:
                 self.save_checkpoint(epoch)
 
+            print("------------------------\n")
+
         self.tensorboard.close()
-        print("\nTraining completed!")
+        print("Training completed!")
 
     def train_one_epoch(self, epoch):
         """
@@ -96,9 +98,11 @@ class Trainer:
         """
         self.model.train()
 
-        total_loss = 0
-        total_loss_seg = 0
-        total_loss_exist = 0
+        train_loss = 0
+        train_loss_seg = 0
+        train_loss_exist = 0
+
+        progressbar = tqdm(range(len(self.train_loader)))
 
         for batch_idx, sample in enumerate(self.train_loader):
             img = sample['img'].to(self.device)
@@ -124,33 +128,23 @@ class Trainer:
             self.lr_scheduler.step()
 
             # Update statistics
-            total_loss += loss.item()
-            total_loss_seg += loss_seg.item()
-            total_loss_exist += loss_exist.item()
+            train_loss = loss.item()
+            train_loss_seg = loss_seg.item()
+            train_loss_exist = loss_exist.item()
             self.global_step += 1
 
-            # Logging
-            if (batch_idx + 1) % self.print_interval == 0:
-                lr = self.optimizer.param_groups[0]['lr']
-                print(f"  Batch [{batch_idx + 1}/{len(self.train_loader)}] "
-                      f"Loss: {loss.item():.4f} "
-                      f"(seg: {loss_seg.item():.4f}, exist: {loss_exist.item():.4f}) "
-                      f"LR: {lr:.6f}")
+            # Update progress bar
+            progressbar.set_description(f"batch loss: {loss.item():.3f}")
+            progressbar.update(1)
 
             # TensorBoard logging
-            self.tensorboard.scalar_summary('train/loss', loss.item(), self.global_step)
-            self.tensorboard.scalar_summary('train/loss_seg', loss_seg.item(), self.global_step)
-            self.tensorboard.scalar_summary('train/loss_exist', loss_exist.item(), self.global_step)
-            self.tensorboard.scalar_summary('train/lr', self.optimizer.param_groups[0]['lr'], self.global_step)
+            lr = self.optimizer.param_groups[0]['lr']
+            self.tensorboard.scalar_summary('train/loss', train_loss, self.global_step)
+            self.tensorboard.scalar_summary('train/loss_seg', train_loss_seg, self.global_step)
+            self.tensorboard.scalar_summary('train/loss_exist', train_loss_exist, self.global_step)
+            self.tensorboard.scalar_summary('train/lr', lr, self.global_step)
 
-        # Epoch summary
-        avg_loss = total_loss / len(self.train_loader)
-        avg_loss_seg = total_loss_seg / len(self.train_loader)
-        avg_loss_exist = total_loss_exist / len(self.train_loader)
-        print(f"\n  Epoch {epoch} Summary - "
-              f"Avg Loss: {avg_loss:.4f} "
-              f"(seg: {avg_loss_seg:.4f}, exist: {avg_loss_exist:.4f})")
-
+        progressbar.close()
         self.tensorboard.flush()
 
     def validate(self, epoch):
@@ -162,9 +156,11 @@ class Trainer:
         """
         self.model.eval()
 
-        total_loss = 0
-        total_loss_seg = 0
-        total_loss_exist = 0
+        val_loss = 0
+        val_loss_seg = 0
+        val_loss_exist = 0
+
+        progressbar = tqdm(range(len(self.val_loader)))
 
         with torch.no_grad():
             for batch_idx, sample in enumerate(self.val_loader):
@@ -184,35 +180,34 @@ class Trainer:
                     loss_seg = loss_seg.mean()
                     loss_exist = loss_exist.mean()
 
-                total_loss += loss.item()
-                total_loss_seg += loss_seg.item()
-                total_loss_exist += loss_exist.item()
+                val_loss += loss.item()
+                val_loss_seg += loss_seg.item()
+                val_loss_exist += loss_exist.item()
+
+                # Update progress bar
+                progressbar.set_description(f"batch loss: {loss.item():.3f}")
+                progressbar.update(1)
 
                 # Visualize first few batches
                 if batch_idx < 5:
                     self._visualize_batch(sample, seg_pred, exist_pred, epoch, batch_idx)
 
-        # Compute averages
-        avg_loss = total_loss / len(self.val_loader)
-        avg_loss_seg = total_loss_seg / len(self.val_loader)
-        avg_loss_exist = total_loss_exist / len(self.val_loader)
-
-        print(f"  Validation - "
-              f"Avg Loss: {avg_loss:.4f} "
-              f"(seg: {avg_loss_seg:.4f}, exist: {avg_loss_exist:.4f})")
+        progressbar.close()
 
         # TensorBoard logging
         val_step = (epoch + 1) * len(self.train_loader)
-        self.tensorboard.scalar_summary('val/loss', avg_loss, val_step)
-        self.tensorboard.scalar_summary('val/loss_seg', avg_loss_seg, val_step)
-        self.tensorboard.scalar_summary('val/loss_exist', avg_loss_exist, val_step)
+        self.tensorboard.scalar_summary('val/loss', val_loss, val_step)
+        self.tensorboard.scalar_summary('val/loss_seg', val_loss_seg, val_step)
+        self.tensorboard.scalar_summary('val/loss_exist', val_loss_exist, val_step)
         self.tensorboard.flush()
 
         # Save best model
-        if avg_loss < self.best_val_loss:
-            self.best_val_loss = avg_loss
+        if val_loss < self.best_val_loss:
+            self.best_val_loss = val_loss
             self.save_checkpoint(epoch, is_best=True)
-            print(f"  New best model saved! (loss: {avg_loss:.4f})")
+            print(f"New best model saved! (loss: {val_loss:.4f})")
+
+        print("------------------------\n")
 
     def _visualize_batch(self, sample, seg_pred, exist_pred, epoch, batch_idx):
         """
@@ -289,4 +284,4 @@ class Trainer:
         self.best_val_loss = checkpoint.get('best_val_loss', float('inf'))
         self.global_step = self.start_epoch * len(self.train_loader)
 
-        print(f"  Resumed from epoch {checkpoint['epoch']}, best_val_loss: {self.best_val_loss:.4f}")
+        print(f"From Epoch: {checkpoint['epoch']}")

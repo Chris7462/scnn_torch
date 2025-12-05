@@ -11,8 +11,26 @@ class SCNN(nn.Module):
     Spatial CNN for lane detection.
 
     Architecture:
-        Backbone (VGG16) → SCNNNeck → Message Passing → SegNeck → Seg Head
-                                                               → Exist Head
+        Input (B, 3, 288, 800)
+            │
+            ▼
+        backbone ──────────────── (B, 512, 36, 100)
+            │
+            ▼
+        scnn_neck ─────────────── (B, 128, 36, 100)
+            │
+            ▼
+        message_passing ───────── (B, 128, 36, 100)
+            │
+            ▼
+        seg_neck ──────────────── (B, 5, 36, 100)    # shared features
+            │
+            ├──────────────────────────────────┐
+            ▼                                  ▼
+        seg_head                          exist_head
+            │                                  │
+            ▼                                  ▼
+        seg_pred ───── (B,5,288,800)      exist_pred ───── (B, 4)
 
     Reference:
         "Spatial As Deep: Spatial CNN for Traffic Scene Understanding"

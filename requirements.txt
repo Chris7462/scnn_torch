@@ -1,0 +1,16 @@
+# Core dependencies
+torch
+torchvision
+
+# Data processing
+numpy
+opencv-python
+
+# Configuration
+pyyaml
+
+# Logging
+tensorboard
+
+# Progress bar
+tqdm

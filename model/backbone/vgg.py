@@ -1,3 +1,4 @@
+
 import torch.nn as nn
 from torchvision.models import vgg16_bn, VGG16_BN_Weights
 
@@ -33,15 +34,18 @@ class VGGBackbone(nn.Module):
 
         self.features = nn.Sequential(*layers)
 
-    def _make_dilated_conv(self, conv):
-        """Convert a conv layer to use dilation=2."""
+    def _make_dilated_conv(self, conv, dilation=2):
+        """Convert a conv layer to use dilation while preserving spatial dims."""
+        # Compute padding that preserves spatial dimensions
+        padding = tuple((dilation * (k - 1)) // 2 for k in conv.kernel_size)
+
         dilated_conv = nn.Conv2d(
             in_channels=conv.in_channels,
             out_channels=conv.out_channels,
             kernel_size=conv.kernel_size,
             stride=conv.stride,
-            padding=tuple(p * 2 for p in conv.padding),
-            dilation=2,
+            padding=padding,
+            dilation=dilation,
             bias=(conv.bias is not None)
         )
         dilated_conv.load_state_dict(conv.state_dict())

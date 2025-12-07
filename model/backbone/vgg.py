@@ -1,5 +1,5 @@
-
 import torch.nn as nn
+from torch import Tensor
 from torchvision.models import vgg16_bn, VGG16_BN_Weights
 
 
@@ -17,7 +17,7 @@ class VGGBackbone(nn.Module):
     DILATED_LAYER_INDICES = [34, 37, 40]
     REMOVED_POOL_INDICES = [33, 43]
 
-    def __init__(self, pretrained=True):
+    def __init__(self, pretrained: bool = True) -> None:
         super().__init__()
 
         weights = VGG16_BN_Weights.DEFAULT if pretrained else None
@@ -34,7 +34,7 @@ class VGGBackbone(nn.Module):
 
         self.features = nn.Sequential(*layers)
 
-    def _make_dilated_conv(self, conv, dilation=2):
+    def _make_dilated_conv(self, conv: nn.Conv2d, dilation: int = 2) -> nn.Conv2d:
         """Convert a conv layer to use dilation while preserving spatial dims."""
         # Compute padding that preserves spatial dimensions
         padding = tuple((dilation * (k - 1)) // 2 for k in conv.kernel_size)
@@ -51,7 +51,7 @@ class VGGBackbone(nn.Module):
         dilated_conv.load_state_dict(conv.state_dict())
         return dilated_conv
 
-    def forward(self, x):
+    def forward(self, x: Tensor) -> Tensor:
         """
         Args:
             x: Input tensor of shape (B, 3, H, W)

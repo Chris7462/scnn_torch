@@ -1,4 +1,5 @@
 import torch.nn as nn
+from torch import Tensor
 
 
 class SegNeck(nn.Module):
@@ -12,7 +13,12 @@ class SegNeck(nn.Module):
         Dropout → Conv(128→5, 1x1)
     """
 
-    def __init__(self, in_channels=128, out_channels=5, dropout=0.1):
+    def __init__(
+        self,
+        in_channels: int = 128,
+        out_channels: int = 5,
+        dropout: float = 0.1,
+    ) -> None:
         super().__init__()
 
         self.layers = nn.Sequential(
@@ -20,7 +26,7 @@ class SegNeck(nn.Module):
             nn.Conv2d(in_channels, out_channels, kernel_size=1),
         )
 
-    def forward(self, x):
+    def forward(self, x: Tensor) -> Tensor:
         """
         Args:
             x: Input tensor of shape (B, 128, H, W)

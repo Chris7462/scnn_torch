@@ -1,4 +1,5 @@
 import torch.nn as nn
+from torch import Tensor
 
 from ..backbone import VGGBackbone
 from ..neck import SCNNNeck, SegNeck
@@ -37,7 +38,12 @@ class SCNN(nn.Module):
         https://arxiv.org/abs/1712.06080
     """
 
-    def __init__(self, input_size=(800, 288), ms_ks=9, pretrained=True):
+    def __init__(
+        self,
+        input_size: tuple[int, int] = (800, 288),
+        ms_ks: int = 9,
+        pretrained: bool = True,
+    ) -> None:
         """
         Args:
             input_size: (width, height) of input image
@@ -60,7 +66,7 @@ class SCNN(nn.Module):
         if not pretrained:
             self._initialize_weights()
 
-    def forward(self, x):
+    def forward(self, x: Tensor) -> tuple[Tensor, Tensor]:
         """
         Args:
             x: Input tensor of shape (B, 3, H, W)
@@ -79,7 +85,7 @@ class SCNN(nn.Module):
 
         return seg_pred, exist_pred
 
-    def _initialize_weights(self):
+    def _initialize_weights(self) -> None:
         """
         Initialize model weights using best practices.
 

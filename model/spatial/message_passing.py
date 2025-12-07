@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch import Tensor
 
 
 class MessagePassing(nn.Module):
@@ -17,7 +18,7 @@ class MessagePassing(nn.Module):
     each pixel to "see" information from the entire row/column.
     """
 
-    def __init__(self, channels=128, kernel_size=9):
+    def __init__(self, channels: int = 128, kernel_size: int = 9) -> None:
         super().__init__()
 
         # Vertical convolutions: kernel (1, k) - wide to capture lane width
@@ -28,7 +29,7 @@ class MessagePassing(nn.Module):
         self.conv_right = nn.Conv2d(channels, channels, (kernel_size, 1), padding=(kernel_size // 2, 0), bias=False)
         self.conv_left = nn.Conv2d(channels, channels, (kernel_size, 1), padding=(kernel_size // 2, 0), bias=False)
 
-    def forward(self, x):
+    def forward(self, x: Tensor) -> Tensor:
         """
         Args:
             x: Input tensor of shape (B, C, H, W)
@@ -42,7 +43,7 @@ class MessagePassing(nn.Module):
         x = self._propagate(x, self.conv_left, dim=3, reverse=True)   # Right to Left
         return x
 
-    def _propagate(self, x, conv, dim, reverse):
+    def _propagate(self, x: Tensor, conv: nn.Conv2d, dim: int, reverse: bool) -> Tensor:
         """
         Propagate information along one direction.
 
@@ -63,8 +64,8 @@ class MessagePassing(nn.Module):
 
         # Sequential propagation: each slice receives info from previous slice
         out = [slices[0]]
-        for i in range(1, len(slices)):
-            out.append(slices[i] + F.relu(conv(out[i - 1])))
+        for slice_tensor in slices[1:]:
+            out.append(slice_tensor + F.relu(conv(out[-1])))
 
         if reverse:
             out = out[::-1]

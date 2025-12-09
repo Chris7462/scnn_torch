@@ -1,7 +1,8 @@
-from torch.optim.lr_scheduler import _LRScheduler
+from torch.optim import Optimizer
+from torch.optim.lr_scheduler import LRScheduler
 
 
-class PolyLR(_LRScheduler):
+class PolyLR(LRScheduler):
     """
     Polynomial learning rate scheduler with warmup.
 
@@ -19,24 +20,32 @@ class PolyLR(_LRScheduler):
         last_epoch: Index of last epoch (for resuming)
     """
 
-    def __init__(self, optimizer, power, max_iter, min_lr=1e-10, warmup=0, last_epoch=-1):
+    def __init__(
+        self,
+        optimizer: Optimizer,
+        power: float,
+        max_iter: int,
+        min_lr: float | list[float] = 1e-10,
+        warmup: int = 0,
+        last_epoch: int = -1,
+    ) -> None:
         self.power = power
         self.max_iter = max_iter
         self.warmup = max(warmup, 0)
 
         # Handle min_lr for each param group
-        if not isinstance(min_lr, (list, tuple)):
-            self.min_lrs = [min_lr] * len(optimizer.param_groups)
-        else:
+        if isinstance(min_lr, (list, tuple)):
             self.min_lrs = list(min_lr)
+        else:
+            self.min_lrs = [min_lr] * len(optimizer.param_groups)
 
         super().__init__(optimizer, last_epoch)
 
-    def get_lr(self):
+    def get_lr(self) -> list[float]:
         """Compute learning rate for current iteration."""
         # Warmup phase: linearly increase lr
-        if self.last_epoch < self.warmup:
-            return [base_lr / self.warmup * (self.last_epoch + 1) for base_lr in self.base_lrs]
+        if self.warmup > 0 and self.last_epoch < self.warmup:
+            return [base_lr * (self.last_epoch + 1) / self.warmup for base_lr in self.base_lrs]
 
         # Polynomial decay phase
         if self.last_epoch < self.max_iter:

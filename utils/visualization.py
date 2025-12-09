@@ -11,7 +11,12 @@ LANE_COLORS = np.array([
 ], dtype='uint8')
 
 
-def visualize_lanes(img, seg_pred, exist_pred, threshold=0.5):
+def visualize_lanes(
+    img: np.ndarray,
+    seg_pred: np.ndarray,
+    exist_pred: np.ndarray,
+    threshold: float = 0.5,
+) -> tuple[np.ndarray, np.ndarray]:
     """
     Visualize lane predictions on image.
 
@@ -45,7 +50,7 @@ def visualize_lanes(img, seg_pred, exist_pred, threshold=0.5):
     return img_overlay, lane_img
 
 
-def add_exist_text(img, exist_pred):
+def add_exist_text(img: np.ndarray, exist_pred: np.ndarray) -> np.ndarray:
     """
     Add existence prediction probabilities to image.
 
@@ -62,15 +67,21 @@ def add_exist_text(img, exist_pred):
     return img
 
 
-def prepare_visualization_batch(imgs, seg_preds, exist_preds, transform_img=None, threshold=0.5):
+def prepare_visualization_batch(
+    imgs: list[str],
+    seg_preds: np.ndarray,
+    exist_preds: np.ndarray,
+    resize_shape: tuple[int, int],
+    threshold: float = 0.5,
+) -> list[np.ndarray]:
     """
     Prepare a batch of visualizations for TensorBoard.
 
     Args:
-        imgs: List of image paths or numpy arrays
+        imgs: List of image paths
         seg_preds: Segmentation predictions (B, 5, H, W)
         exist_preds: Existence predictions (B, 4)
-        transform_img: Optional transform to apply to loaded images
+        resize_shape: Target size as (width, height)
         threshold: Threshold for existence prediction
 
     Returns:
@@ -79,14 +90,9 @@ def prepare_visualization_batch(imgs, seg_preds, exist_preds, transform_img=None
     result_imgs = []
 
     for i in range(len(seg_preds)):
-        # Load image if path is given
-        if isinstance(imgs[i], str):
-            img = cv2.imread(imgs[i])
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-            if transform_img is not None:
-                img = transform_img({'img': img})['img']
-        else:
-            img = imgs[i]
+        img = cv2.imread(imgs[i])
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        img = cv2.resize(img, resize_shape, interpolation=cv2.INTER_CUBIC)
 
         seg_pred = seg_preds[i]
         exist_pred = exist_preds[i]

@@ -1,8 +1,9 @@
-import os
+from pathlib import Path
 
 import cv2
 import numpy as np
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 from tqdm import tqdm
 
@@ -20,15 +21,21 @@ class Evaluator:
         device: Device to run on
     """
 
-    def __init__(self, model, test_loader, config, device):
+    def __init__(
+        self,
+        model: nn.Module,
+        test_loader,
+        config: dict,
+        device: torch.device,
+    ) -> None:
         self.model = model
         self.test_loader = test_loader
         self.config = config
         self.device = device
 
         # Output settings
-        self.output_dir = config.get('output_dir', 'output')
-        os.makedirs(self.output_dir, exist_ok=True)
+        self.output_dir = Path(config.get('output_dir', 'output'))
+        self.output_dir.mkdir(parents=True, exist_ok=True)
 
         # Evaluation settings from config
         eval_cfg = config.get('evaluation', {})
@@ -37,7 +44,7 @@ class Evaluator:
         self.pts = eval_cfg.get('pts', 18)
         self.thresh = eval_cfg.get('thresh', 0.3)
 
-    def evaluate(self):
+    def evaluate(self) -> Path:
         """
         Run inference on test set and save predictions.
 
@@ -71,7 +78,12 @@ class Evaluator:
         print(f"\nPredictions saved to: {self.output_dir}")
         return self.output_dir
 
-    def _process_prediction(self, seg_pred, exist_pred, img_name):
+    def _process_prediction(
+        self,
+        seg_pred: np.ndarray,
+        exist_pred: np.ndarray,
+        img_name: str,
+    ) -> None:
         """
         Process single prediction and save to file.
 
@@ -86,7 +98,7 @@ class Evaluator:
 
         # Build output path
         save_path = self._get_save_path(img_name)
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        save_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Save predictions
         with open(save_path, 'w') as f:
@@ -95,7 +107,12 @@ class Evaluator:
                     f.write(f"{x} {y} ")
                 f.write("\n")
 
-    def _prob2lines(self, seg_pred, exist, smooth=True):
+    def _prob2lines(
+        self,
+        seg_pred: np.ndarray,
+        exist: list[int],
+        smooth: bool = True,
+    ) -> list[list[tuple[int, int]]]:
         """
         Convert probability map to lane coordinates.
 
@@ -133,7 +150,14 @@ class Evaluator:
 
         return coordinates
 
-    def _get_lane_coords(self, prob_map, h, w, H, W):
+    def _get_lane_coords(
+        self,
+        prob_map: np.ndarray,
+        h: int,
+        w: int,
+        H: int,
+        W: int,
+    ) -> list[tuple[int, int]]:
         """
         Extract lane coordinates from probability map.
 
@@ -161,7 +185,7 @@ class Evaluator:
 
         return coords
 
-    def _get_save_path(self, img_name):
+    def _get_save_path(self, img_name: str) -> Path:
         """
         Get save path for prediction file.
 
@@ -171,25 +195,10 @@ class Evaluator:
         Returns:
             Path to save prediction file
         """
-        # Extract relative path components
-        parts = self._split_path(img_name)
+        img_path = Path(img_name)
 
         # Build output path: output_dir/driver_xxx/xxx/xxx.lines.txt
-        save_dir = os.path.join(self.output_dir, *parts[-3:-1])
-        save_name = parts[-1].replace('.jpg', '.lines.txt')
+        save_name = img_path.stem + '.lines.txt'
+        save_path = self.output_dir / img_path.parts[-3] / img_path.parts[-2] / save_name
 
-        return os.path.join(save_dir, save_name)
-
-    @staticmethod
-    def _split_path(path):
-        """Split path into list of components."""
-        folders = []
-        while True:
-            path, folder = os.path.split(path)
-            if folder != "":
-                folders.insert(0, folder)
-            else:
-                if path != "":
-                    folders.insert(0, path)
-                break
-        return folders
+        return save_path

@@ -4,8 +4,9 @@ from typing import Literal
 import cv2
 import numpy as np
 import torch
-from torch import Tensor
 from torch.utils.data import Dataset
+
+import albumentations as A
 
 
 ImageSet = Literal['train', 'val', 'test']
@@ -18,7 +19,7 @@ class CULane(Dataset):
     Args:
         root: Path to CULane dataset root directory
         image_set: One of 'train', 'val', or 'test'
-        transforms: Optional transforms to apply to samples
+        transforms: Optional albumentations transforms to apply to samples
 
     Dataset structure expected:
         root/
@@ -40,7 +41,7 @@ class CULane(Dataset):
         self,
         root: str | Path,
         image_set: ImageSet,
-        transforms: callable = None,
+        transforms: A.Compose = None,
     ) -> None:
         super().__init__()
         assert image_set in ('train', 'val', 'test'), "image_set must be 'train', 'val', or 'test'"
@@ -85,22 +86,26 @@ class CULane(Dataset):
 
         if self.image_set != 'test':
             seg_label = cv2.imread(str(self.seg_label_list[idx]))[:, :, 0]
-            exist = np.array(self.exist_list[idx])
+            exist = np.array(self.exist_list[idx], dtype=np.float32)
         else:
             seg_label = None
             exist = None
 
-        sample = {
+        if self.transforms is not None:
+            transformed = self.transforms(image=img, mask=seg_label)
+            img = transformed['image']
+            if seg_label is not None:
+                seg_label = transformed['mask'].long()
+
+        if exist is not None:
+            exist = torch.from_numpy(exist)
+
+        return {
             'img': img,
             'seg_label': seg_label,
             'exist': exist,
             'img_name': str(self.img_list[idx]),
         }
-
-        if self.transforms is not None:
-            sample = self.transforms(sample)
-
-        return sample
 
     def __len__(self) -> int:
         return len(self.img_list)
@@ -116,24 +121,13 @@ class CULane(Dataset):
         Returns:
             Dictionary with batched tensors
         """
-        if isinstance(batch[0]['img'], Tensor):
-            img = torch.stack([b['img'] for b in batch])
-        else:
-            img = [b['img'] for b in batch]
+        img = torch.stack([b['img'] for b in batch])
+        img_name = [b['img_name'] for b in batch]
 
         if batch[0]['seg_label'] is None:
-            seg_label = None
-            exist = None
-        elif isinstance(batch[0]['seg_label'], Tensor):
-            seg_label = torch.stack([b['seg_label'] for b in batch])
-            exist = torch.stack([b['exist'] for b in batch])
-        else:
-            seg_label = [b['seg_label'] for b in batch]
-            exist = [b['exist'] for b in batch]
+            return {'img': img, 'seg_label': None, 'exist': None, 'img_name': img_name}
 
-        return {
-            'img': img,
-            'seg_label': seg_label,
-            'exist': exist,
-            'img_name': [b['img_name'] for b in batch],
-        }
+        seg_label = torch.stack([b['seg_label'] for b in batch])
+        exist = torch.stack([b['exist'] for b in batch])
+
+        return {'img': img, 'seg_label': seg_label, 'exist': exist, 'img_name': img_name}

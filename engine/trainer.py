@@ -1,7 +1,7 @@
-import os
 from pathlib import Path
 import time
 
+import cv2
 import torch
 import torch.nn as nn
 from torch import Tensor
@@ -9,7 +9,6 @@ from tqdm import tqdm
 
 from utils.tensorboard import TensorBoard
 from utils.visualization import prepare_visualization_batch
-from datasets.transforms import Resize
 
 
 class Trainer:
@@ -58,9 +57,8 @@ class Trainer:
         # TensorBoard
         self.tensorboard = TensorBoard(str(self.save_dir))
 
-        # Visualization transform
-        resize_shape = tuple(config['dataset']['resize_shape'])
-        self.transform_val_img = Resize(resize_shape)
+        # Visualization settings
+        self.resize_shape = tuple(config['dataset']['resize_shape'])
 
         # Training state
         self.start_epoch = 0
@@ -202,14 +200,14 @@ class Trainer:
             batch_idx: Current batch index
         """
         seg_pred_np = seg_pred.detach().cpu().numpy()
-        exist_pred_np = torch.sigmoid(exist_pred).detach().cpu().numpy()  # Apply sigmoid
+        exist_pred_np = torch.sigmoid(exist_pred).detach().cpu().numpy()
         img_names = sample['img_name']
 
         vis_imgs = prepare_visualization_batch(
             imgs=img_names,
             seg_preds=seg_pred_np,
             exist_preds=exist_pred_np,
-            transform_img=self.transform_val_img,
+            resize_shape=self.resize_shape,
         )
 
         self.tensorboard.image_summary(f'val/batch_{batch_idx}', vis_imgs, epoch)

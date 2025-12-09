@@ -5,7 +5,7 @@ from torch.utils.data import DataLoader
 import yaml
 
 from datasets import CULane
-from datasets.transforms import Compose, Resize, ToTensor, Normalize
+from datasets.transforms import get_val_transforms
 from model import SCNN
 from engine import Evaluator
 
@@ -21,27 +21,23 @@ def parse_args():
     return parser.parse_args()
 
 
-def load_config(config_path):
+def load_config(config_path: str) -> dict:
     """Load configuration from YAML file."""
     with open(config_path, 'r') as f:
         config = yaml.safe_load(f)
     return config
 
 
-def build_transforms(config):
+def build_transforms(config: dict):
     """Build transforms for testing."""
     resize_shape = tuple(config['dataset']['resize_shape'])
     mean = tuple(config['normalize']['mean'])
     std = tuple(config['normalize']['std'])
 
-    return Compose(
-        Resize(resize_shape),
-        ToTensor(),
-        Normalize(mean=mean, std=std),
-    )
+    return get_val_transforms(resize_shape, mean, std)
 
 
-def build_dataloader(config, transforms):
+def build_dataloader(config: dict, transforms):
     """Build test dataloader."""
     dataset = CULane(
         root=config['dataset']['root'],
@@ -61,7 +57,7 @@ def build_dataloader(config, transforms):
     return dataloader
 
 
-def build_model(config, device):
+def build_model(config: dict, device: torch.device):
     """Build SCNN model."""
     input_size = tuple(config['model']['input_size'])
     ms_ks = config['model']['ms_ks']
@@ -77,7 +73,7 @@ def build_model(config, device):
     return model
 
 
-def load_checkpoint(model, checkpoint_path, device):
+def load_checkpoint(model, checkpoint_path: str, device: torch.device):
     """Load model weights from checkpoint."""
     print(f"Loading checkpoint: {checkpoint_path}")
     checkpoint = torch.load(checkpoint_path, map_location=device)

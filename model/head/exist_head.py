@@ -1,4 +1,5 @@
 import torch.nn as nn
+from torch import Tensor
 
 
 class ExistHead(nn.Module):
@@ -14,7 +15,13 @@ class ExistHead(nn.Module):
         4 logits, one for each lane (use BCEWithLogitsLoss for training)
     """
 
-    def __init__(self, in_channels=5, input_height=36, input_width=100, num_lanes=4):
+    def __init__(
+        self,
+        in_channels: int = 5,
+        input_height: int = 36,
+        input_width: int = 100,
+        num_lanes: int = 4,
+    ) -> None:
         super().__init__()
 
         # After avg pool with kernel=2, spatial dims are halved
@@ -33,7 +40,7 @@ class ExistHead(nn.Module):
             nn.Linear(128, num_lanes),
         )
 
-    def forward(self, x):
+    def forward(self, x: Tensor) -> Tensor:
         """
         Args:
             x: Input tensor of shape (B, 5, H, W) - segmentation logits before upsampling

@@ -1,5 +1,6 @@
 import torch.nn as nn
 import torch.nn.functional as F
+from torch import Tensor
 
 
 class SegHead(nn.Module):
@@ -16,12 +17,12 @@ class SegHead(nn.Module):
         1-4: Lane 1-4
     """
 
-    def __init__(self, upsample_scale=8):
+    def __init__(self, upsample_scale: int = 8) -> None:
         super().__init__()
 
         self.upsample_scale = upsample_scale
 
-    def forward(self, x):
+    def forward(self, x: Tensor) -> Tensor:
         """
         Args:
             x: Input tensor of shape (B, 5, H, W)

@@ -1,4 +1,5 @@
 import torch.nn as nn
+from torch import Tensor
 
 
 class SCNNNeck(nn.Module):
@@ -13,7 +14,13 @@ class SCNNNeck(nn.Module):
         Conv(1024→128, 1x1) → BN → ReLU
     """
 
-    def __init__(self, in_channels=512, mid_channels=1024, out_channels=128, dilation=4):
+    def __init__(
+        self,
+        in_channels: int = 512,
+        mid_channels: int = 1024,
+        out_channels: int = 128,
+        dilation: int = 4,
+    ) -> None:
         super().__init__()
 
         # Compute padding that preserves spatial dimensions
@@ -29,7 +36,7 @@ class SCNNNeck(nn.Module):
             nn.ReLU(inplace=True),
         )
 
-    def forward(self, x):
+    def forward(self, x: Tensor) -> Tensor:
         """
         Args:
             x: Input tensor of shape (B, 512, H, W)

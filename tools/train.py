@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader
 import yaml
 
 from datasets import CULane
-from datasets.transforms import Compose, Resize, Rotation, ToTensor, Normalize
+from datasets.transforms import get_train_transforms, get_val_transforms
 from model import SCNN
 from model.loss import SCNNLoss
 from engine import Trainer, PolyLR
@@ -21,14 +21,14 @@ def parse_args():
     return parser.parse_args()
 
 
-def load_config(config_path):
+def load_config(config_path: str) -> dict:
     """Load configuration from YAML file."""
     with open(config_path, 'r') as f:
         config = yaml.safe_load(f)
     return config
 
 
-def build_transforms(config, is_train=True):
+def build_transforms(config: dict, is_train: bool = True):
     """Build transforms for training or validation."""
     resize_shape = tuple(config['dataset']['resize_shape'])
     mean = tuple(config['normalize']['mean'])
@@ -36,21 +36,12 @@ def build_transforms(config, is_train=True):
 
     if is_train:
         rotation = config['train']['rotation']
-        return Compose(
-            Resize(resize_shape),
-            Rotation(rotation),
-            ToTensor(),
-            Normalize(mean=mean, std=std),
-        )
+        return get_train_transforms(resize_shape, rotation, mean, std)
     else:
-        return Compose(
-            Resize(resize_shape),
-            ToTensor(),
-            Normalize(mean=mean, std=std),
-        )
+        return get_val_transforms(resize_shape, mean, std)
 
 
-def build_dataloader(config, image_set, transforms):
+def build_dataloader(config: dict, image_set: str, transforms):
     """Build dataloader for given image set."""
     dataset = CULane(
         root=config['dataset']['root'],
@@ -71,7 +62,7 @@ def build_dataloader(config, image_set, transforms):
     return dataloader
 
 
-def build_model(config, device):
+def build_model(config: dict, device: torch.device):
     """Build SCNN model."""
     input_size = tuple(config['model']['input_size'])
     ms_ks = config['model']['ms_ks']
@@ -88,7 +79,7 @@ def build_model(config, device):
     return model
 
 
-def build_optimizer(config, model):
+def build_optimizer(config: dict, model):
     """Build optimizer."""
     optimizer_cfg = config['optimizer']
 
@@ -103,7 +94,7 @@ def build_optimizer(config, model):
     return optimizer
 
 
-def build_lr_scheduler(config, optimizer, steps_per_epoch):
+def build_lr_scheduler(config: dict, optimizer, steps_per_epoch: int):
     """Build learning rate scheduler."""
     scheduler_cfg = config['lr_scheduler']
 
@@ -120,7 +111,7 @@ def build_lr_scheduler(config, optimizer, steps_per_epoch):
     return scheduler
 
 
-def build_criterion(config, device):
+def build_criterion(config: dict, device: torch.device):
     """Build loss function."""
     loss_cfg = config['loss']
 

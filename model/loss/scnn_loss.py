@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from torch import Tensor
 
 
 class SCNNLoss(nn.Module):
@@ -13,7 +14,12 @@ class SCNNLoss(nn.Module):
     Total loss = seg_loss * seg_weight + exist_loss * exist_weight
     """
 
-    def __init__(self, seg_weight=1.0, exist_weight=0.1, background_weight=0.4):
+    def __init__(
+        self,
+        seg_weight: float = 1.0,
+        exist_weight: float = 0.1,
+        background_weight: float = 0.4,
+    ) -> None:
         super().__init__()
 
         self.seg_weight = seg_weight
@@ -26,7 +32,13 @@ class SCNNLoss(nn.Module):
         # BCEWithLogitsLoss is more numerically stable than Sigmoid + BCELoss
         self.exist_loss = nn.BCEWithLogitsLoss()
 
-    def forward(self, seg_pred, exist_pred, seg_gt, exist_gt):
+    def forward(
+        self,
+        seg_pred: Tensor,
+        exist_pred: Tensor,
+        seg_gt: Tensor,
+        exist_gt: Tensor,
+    ) -> tuple[Tensor, Tensor, Tensor]:
         """
         Args:
             seg_pred: Segmentation logits of shape (B, 5, H, W)

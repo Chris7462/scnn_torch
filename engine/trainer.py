@@ -1,8 +1,10 @@
 import os
+from pathlib import Path
 import time
 
 import torch
 import torch.nn as nn
+from torch import Tensor
 from tqdm import tqdm
 
 from utils.tensorboard import TensorBoard
@@ -27,15 +29,15 @@ class Trainer:
 
     def __init__(
         self,
-        model,
+        model: nn.Module,
         train_loader,
         val_loader,
-        criterion,
-        optimizer,
+        criterion: nn.Module,
+        optimizer: torch.optim.Optimizer,
         lr_scheduler,
-        config,
-        device,
-    ):
+        config: dict,
+        device: torch.device,
+    ) -> None:
         self.model = model
         self.train_loader = train_loader
         self.val_loader = val_loader
@@ -49,12 +51,12 @@ class Trainer:
         self.epochs = config['train']['epochs']
 
         # Checkpoint settings
-        self.save_dir = config['checkpoint']['save_dir']
+        self.save_dir = Path(config['checkpoint']['save_dir'])
         self.save_interval = config['checkpoint']['save_interval']
-        os.makedirs(self.save_dir, exist_ok=True)
+        self.save_dir.mkdir(parents=True, exist_ok=True)
 
         # TensorBoard
-        self.tensorboard = TensorBoard(self.save_dir)
+        self.tensorboard = TensorBoard(str(self.save_dir))
 
         # Visualization transform
         resize_shape = tuple(config['dataset']['resize_shape'])
@@ -65,7 +67,7 @@ class Trainer:
         self.best_val_loss = float('inf')
         self.global_step = 0
 
-    def train(self):
+    def train(self) -> None:
         """Main training loop over all epochs."""
         for epoch in range(self.start_epoch, self.epochs):
             print(f"\nTrain Epoch: {epoch}")
@@ -88,13 +90,13 @@ class Trainer:
         self.tensorboard.close()
         print("Training completed!")
 
-    def train_one_epoch(self):
+    def train_one_epoch(self) -> None:
         """Training logic for one epoch."""
         self.model.train()
 
         for sample in tqdm(self.train_loader, desc="Training"):
             img = sample['img'].to(self.device)
-            seg_gt = sample['segLabel'].to(self.device)
+            seg_gt = sample['seg_label'].to(self.device)
             exist_gt = sample['exist'].to(self.device)
 
             # Forward pass
@@ -127,7 +129,7 @@ class Trainer:
 
         self.tensorboard.flush()
 
-    def validate(self, epoch):
+    def validate(self, epoch: int) -> None:
         """
         Validation logic.
 
@@ -143,7 +145,7 @@ class Trainer:
         with torch.no_grad():
             for batch_idx, sample in enumerate(tqdm(self.val_loader, desc="Validating")):
                 img = sample['img'].to(self.device)
-                seg_gt = sample['segLabel'].to(self.device)
+                seg_gt = sample['seg_label'].to(self.device)
                 exist_gt = sample['exist'].to(self.device)
 
                 # Forward pass
@@ -181,7 +183,14 @@ class Trainer:
 
         print("------------------------\n")
 
-    def _visualize_batch(self, sample, seg_pred, exist_pred, epoch, batch_idx):
+    def _visualize_batch(
+        self,
+        sample: dict,
+        seg_pred: Tensor,
+        exist_pred: Tensor,
+        epoch: int,
+        batch_idx: int,
+    ) -> None:
         """
         Visualize predictions for a batch.
 
@@ -205,7 +214,7 @@ class Trainer:
 
         self.tensorboard.image_summary(f'val/batch_{batch_idx}', vis_imgs, epoch)
 
-    def save_checkpoint(self, epoch, is_best=False):
+    def save_checkpoint(self, epoch: int, is_best: bool = False) -> None:
         """
         Save model checkpoint.
 
@@ -222,16 +231,16 @@ class Trainer:
         }
 
         # Save latest checkpoint
-        save_path = os.path.join(self.save_dir, 'latest.pth')
+        save_path = self.save_dir / 'latest.pth'
         torch.save(state, save_path)
         print(f"  Checkpoint saved: {save_path}")
 
         # Save best checkpoint
         if is_best:
-            best_path = os.path.join(self.save_dir, 'best.pth')
+            best_path = self.save_dir / 'best.pth'
             torch.save(state, best_path)
 
-    def load_checkpoint(self, checkpoint_path):
+    def load_checkpoint(self, checkpoint_path: str | Path) -> None:
         """
         Load checkpoint to resume training.
 

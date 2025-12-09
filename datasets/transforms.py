@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import torch
+from torch import Tensor
 from torchvision.transforms import Normalize as TorchNormalize
 
 
@@ -10,10 +11,10 @@ class CustomTransform:
     def __call__(self, *args, **kwargs):
         raise NotImplementedError
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.__class__.__name__
 
-    def __eq__(self, name):
+    def __eq__(self, name) -> bool:
         return str(self) == name
 
     def __iter__(self):
@@ -22,7 +23,7 @@ class CustomTransform:
                 yield t
         return iter_fn()
 
-    def __contains__(self, name):
+    def __contains__(self, name) -> bool:
         for t in self.__iter__():
             if isinstance(t, Compose):
                 if name in t:
@@ -35,10 +36,10 @@ class CustomTransform:
 class Compose(CustomTransform):
     """Compose multiple transforms together."""
 
-    def __init__(self, *transforms):
+    def __init__(self, *transforms) -> None:
         self.transforms = [*transforms]
 
-    def __call__(self, sample):
+    def __call__(self, sample: dict) -> dict:
         for t in self.transforms:
             sample = t(sample)
         return sample
@@ -64,25 +65,25 @@ class Resize(CustomTransform):
         size: Target size as (width, height) or single int for square
     """
 
-    def __init__(self, size):
+    def __init__(self, size: int | tuple[int, int]) -> None:
         if isinstance(size, int):
             size = (size, size)
         self.size = size  # (W, H)
 
-    def __call__(self, sample):
+    def __call__(self, sample: dict) -> dict:
         img = sample.get('img')
-        segLabel = sample.get('segLabel', None)
+        seg_label = sample.get('seg_label', None)
 
         img = cv2.resize(img, self.size, interpolation=cv2.INTER_CUBIC)
-        if segLabel is not None:
-            segLabel = cv2.resize(segLabel, self.size, interpolation=cv2.INTER_NEAREST)
+        if seg_label is not None:
+            seg_label = cv2.resize(seg_label, self.size, interpolation=cv2.INTER_NEAREST)
 
         _sample = sample.copy()
         _sample['img'] = img
-        _sample['segLabel'] = segLabel
+        _sample['seg_label'] = seg_label
         return _sample
 
-    def reset_size(self, size):
+    def reset_size(self, size: int | tuple[int, int]) -> None:
         if isinstance(size, int):
             size = (size, size)
         self.size = size
@@ -99,7 +100,13 @@ class RandomResize(Resize):
         maxH: Maximum height (defaults to maxW if not specified)
     """
 
-    def __init__(self, minW, maxW, minH=None, maxH=None):
+    def __init__(
+        self,
+        minW: int,
+        maxW: int,
+        minH: int = None,
+        maxH: int = None,
+    ) -> None:
         if minH is None or maxH is None:
             minH, maxH = minW, maxW
         super().__init__((minW, minH))
@@ -108,7 +115,7 @@ class RandomResize(Resize):
         self.minH = minH
         self.maxH = maxH
 
-    def random_set_size(self):
+    def random_set_size(self) -> None:
         w = np.random.randint(self.minW, self.maxW + 1)
         h = np.random.randint(self.minH, self.maxH + 1)
         self.reset_size((w, h))
@@ -122,26 +129,26 @@ class Rotation(CustomTransform):
         theta: Maximum rotation angle in degrees (rotation will be in range [-theta/2, theta/2])
     """
 
-    def __init__(self, theta):
+    def __init__(self, theta: float) -> None:
         self.theta = theta
 
-    def __call__(self, sample):
+    def __call__(self, sample: dict) -> dict:
         img = sample.get('img')
-        segLabel = sample.get('segLabel', None)
+        seg_label = sample.get('seg_label', None)
 
         u = np.random.uniform()
         degree = (u - 0.5) * self.theta
         R = cv2.getRotationMatrix2D((img.shape[1] // 2, img.shape[0] // 2), degree, 1)
         img = cv2.warpAffine(img, R, (img.shape[1], img.shape[0]), flags=cv2.INTER_LINEAR)
-        if segLabel is not None:
-            segLabel = cv2.warpAffine(segLabel, R, (segLabel.shape[1], segLabel.shape[0]), flags=cv2.INTER_NEAREST)
+        if seg_label is not None:
+            seg_label = cv2.warpAffine(seg_label, R, (seg_label.shape[1], seg_label.shape[0]), flags=cv2.INTER_NEAREST)
 
         _sample = sample.copy()
         _sample['img'] = img
-        _sample['segLabel'] = segLabel
+        _sample['seg_label'] = seg_label
         return _sample
 
-    def reset_theta(self, theta):
+    def reset_theta(self, theta: float) -> None:
         self.theta = theta
 
 
@@ -154,10 +161,10 @@ class Normalize(CustomTransform):
         std: Sequence of standard deviations for each channel
     """
 
-    def __init__(self, mean, std):
+    def __init__(self, mean: tuple[float, ...], std: tuple[float, ...]) -> None:
         self.transform = TorchNormalize(mean, std)
 
-    def __call__(self, sample):
+    def __call__(self, sample: dict) -> dict:
         img = sample.get('img')
 
         img = self.transform(img)
@@ -175,26 +182,26 @@ class ToTensor(CustomTransform):
         dtype: Data type for image tensor (default: torch.float)
     """
 
-    def __init__(self, dtype=torch.float):
+    def __init__(self, dtype: torch.dtype = torch.float) -> None:
         self.dtype = dtype
 
-    def __call__(self, sample):
+    def __call__(self, sample: dict) -> dict:
         img = sample.get('img')
-        segLabel = sample.get('segLabel', None)
+        seg_label = sample.get('seg_label', None)
         exist = sample.get('exist', None)
 
         # Convert image: (H, W, C) -> (C, H, W), scale to [0, 1]
         img = img.transpose(2, 0, 1)
         img = torch.from_numpy(img).type(self.dtype) / 255.
 
-        if segLabel is not None:
-            segLabel = torch.from_numpy(segLabel).type(torch.long)
+        if seg_label is not None:
+            seg_label = torch.from_numpy(seg_label).type(torch.long)
         if exist is not None:
             exist = torch.from_numpy(exist).type(torch.float32)
 
         _sample = sample.copy()
         _sample['img'] = img
-        _sample['segLabel'] = segLabel
+        _sample['seg_label'] = seg_label
         _sample['exist'] = exist
         return _sample
 
@@ -208,32 +215,32 @@ class RandomFlip(CustomTransform):
         prob_y: Probability of vertical flip
     """
 
-    def __init__(self, prob_x=0, prob_y=0):
+    def __init__(self, prob_x: float = 0, prob_y: float = 0) -> None:
         self.prob_x = prob_x
         self.prob_y = prob_y
 
-    def __call__(self, sample):
+    def __call__(self, sample: dict) -> dict:
         img = sample.get('img').copy()
-        segLabel = sample.get('segLabel', None)
-        if segLabel is not None:
-            segLabel = segLabel.copy()
+        seg_label = sample.get('seg_label', None)
+        if seg_label is not None:
+            seg_label = seg_label.copy()
 
         flip_x = np.random.choice([False, True], p=(1 - self.prob_x, self.prob_x))
         flip_y = np.random.choice([False, True], p=(1 - self.prob_y, self.prob_y))
 
         if flip_x:
             img = np.ascontiguousarray(np.flip(img, axis=1))
-            if segLabel is not None:
-                segLabel = np.ascontiguousarray(np.flip(segLabel, axis=1))
+            if seg_label is not None:
+                seg_label = np.ascontiguousarray(np.flip(seg_label, axis=1))
 
         if flip_y:
             img = np.ascontiguousarray(np.flip(img, axis=0))
-            if segLabel is not None:
-                segLabel = np.ascontiguousarray(np.flip(segLabel, axis=0))
+            if seg_label is not None:
+                seg_label = np.ascontiguousarray(np.flip(seg_label, axis=0))
 
         _sample = sample.copy()
         _sample['img'] = img
-        _sample['segLabel'] = segLabel
+        _sample['seg_label'] = seg_label
         return _sample
 
 
@@ -245,11 +252,11 @@ class Darkness(CustomTransform):
         coeff: Maximum darkness coefficient (must be >= 1.0)
     """
 
-    def __init__(self, coeff):
+    def __init__(self, coeff: float) -> None:
         assert coeff >= 1.0, "Darkness coefficient must be >= 1.0"
         self.coeff = coeff
 
-    def __call__(self, sample):
+    def __call__(self, sample: dict) -> dict:
         img = sample.get('img')
 
         coeff = np.random.uniform(1.0, self.coeff)

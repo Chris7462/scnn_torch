@@ -18,15 +18,18 @@ ln -s /path/to/CULane data/CULane
 Expected structure:
 ```
 data/CULane/
-├── driver_100_30frame/
-├── driver_161_90frame/
-├── driver_182_30frame/
-├── driver_193_90frame/
-├── driver_23_30frame/
-├── driver_37_30frame/
-├── laneseg_label_w16/
-├── laneseg_label_w16_test/
+├── driver_100_30frame/       # Test example, no ground truth
+├── driver_161_90frame/       # Training example
+├── driver_182_30frame/       # Training example
+├── driver_193_90frame/       # Test example, no ground truth
+├── driver_23_30frame/        # Training & Validation example
+├── driver_37_30frame/        # Test example, no ground truth
+├── laneseg_label_w16/        # Ground truth for training & validation
+├── laneseg_label_w16_test/   # No ground truth for test set
 └── list/
+    ├── train_gt.txt
+    ├── val_gt.txt
+    └── test.txt
 ```
 
 ## Training
@@ -39,10 +42,28 @@ Resume from checkpoint:
 python tools/train.py --config configs/scnn_culane.yaml --resume checkpoints/latest.pth
 ```
 
+Training outputs:
+- Checkpoints saved to `checkpoints/` (configurable in config file)
+- Training history plot saved as `training_history.png`
+
 ## Testing
 ```bash
 python tools/test.py --config configs/scnn_culane.yaml --checkpoint checkpoints/best.pth
 ```
+
+With visualization (saves first 20 images with lane overlay):
+```bash
+python tools/test.py --config configs/scnn_culane.yaml --checkpoint checkpoints/best.pth --visualize
+```
+
+Customize number of visualizations:
+```bash
+python tools/test.py --config configs/scnn_culane.yaml --checkpoint checkpoints/best.pth --visualize --num_visualize 100
+```
+
+Test outputs:
+- Predictions saved to `output/predictions/`
+- Visualizations saved to `output/visualizations/` (if `--visualize` enabled)
 
 ## Project Structure
 ```
@@ -55,7 +76,7 @@ python tools/test.py --config configs/scnn_culane.yaml --checkpoint checkpoints/
 │   ├── head/         # Segmentation and existence heads
 │   └── loss/         # Loss functions
 ├── engine/           # Training and evaluation
-├── utils/            # Utilities
+├── utils/            # Utilities (logging, visualization, config)
 └── tools/            # Train and test scripts
 ```
 

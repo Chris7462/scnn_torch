@@ -18,6 +18,10 @@ def parse_args():
                         help='Path to model checkpoint')
     parser.add_argument('--output_dir', type=str, default='output',
                         help='Directory to save predictions')
+    parser.add_argument('--visualize', action='store_true',
+                        help='Save visualization images')
+    parser.add_argument('--num_visualize', type=int, default=50,
+                        help='Number of images to visualize (default: 50)')
     return parser.parse_args()
 
 
@@ -77,7 +81,7 @@ def load_checkpoint(model, checkpoint_path: str, device: torch.device):
     else:
         model.load_state_dict(checkpoint['net'])
 
-    print(f"  Loaded from epoch {checkpoint['epoch']}")
+    print(f"  Loaded from epoch {checkpoint['epoch'] + 1}")
     return model
 
 
@@ -116,17 +120,23 @@ def main():
         test_loader=test_loader,
         config=config,
         device=device,
+        visualize=args.visualize,
+        num_visualize=args.num_visualize,
     )
 
     # Run evaluation
     print("\nRunning evaluation...")
+    if args.visualize:
+        print(f"  Visualizing first {args.num_visualize} images")
     output_dir = evaluator.evaluate()
 
     print(f"\nEvaluation complete!")
-    print(f"Predictions saved to: {output_dir}")
+    print(f"Predictions saved to: {output_dir}/predictions")
+    if args.visualize:
+        print(f"Visualizations saved to: {output_dir}/visualizations")
     print(f"\nTo run official CULane evaluation:")
     print(f"  cd utils/lane_evaluation/CULane")
-    print(f"  ./evaluate -a <anno_dir> -d {output_dir} -i <img_dir> -l <list_file>")
+    print(f"  ./evaluate -a <anno_dir> -d {output_dir}/predictions -i <img_dir> -l <list_file>")
 
 
 if __name__ == '__main__':

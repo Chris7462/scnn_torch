@@ -5,7 +5,10 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch import Tensor
 from tqdm import tqdm
+
+from utils.visualization import visualize_lanes
 
 
 class Evaluator:
@@ -19,6 +22,8 @@ class Evaluator:
         test_loader: Test data loader
         config: Configuration dictionary
         device: Device to run on
+        visualize: Whether to save visualization images
+        num_visualize: Number of images to visualize
     """
 
     def __init__(
@@ -27,15 +32,23 @@ class Evaluator:
         test_loader,
         config: dict,
         device: torch.device,
+        visualize: bool = False,
+        num_visualize: int = 20,
     ) -> None:
         self.model = model
         self.test_loader = test_loader
         self.config = config
         self.device = device
+        self.visualize = visualize
+        self.num_visualize = num_visualize
 
         # Output settings
         self.output_dir = Path(config.get('output_dir', 'output'))
-        self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.pred_dir = self.output_dir / 'predictions'
+        self.vis_dir = self.output_dir / 'visualizations'
+        self.pred_dir.mkdir(parents=True, exist_ok=True)
+        if self.visualize:
+            self.vis_dir.mkdir(parents=True, exist_ok=True)
 
         # Evaluation settings from config
         eval_cfg = config.get('evaluation', {})
@@ -43,6 +56,9 @@ class Evaluator:
         self.y_px_gap = eval_cfg.get('y_px_gap', 20)
         self.pts = eval_cfg.get('pts', 18)
         self.thresh = eval_cfg.get('thresh', 0.3)
+
+        # Visualization counter
+        self.vis_count = 0
 
     def evaluate(self) -> Path:
         """
@@ -61,7 +77,7 @@ class Evaluator:
                 # Forward pass
                 seg_pred, exist_pred = self.model(img)
                 seg_pred = F.softmax(seg_pred, dim=1)
-                exist_pred = torch.sigmoid(exist_pred)  # Apply sigmoid
+                exist_pred = torch.sigmoid(exist_pred)
 
                 # Convert to numpy
                 seg_pred = seg_pred.detach().cpu().numpy()
@@ -69,16 +85,18 @@ class Evaluator:
 
                 # Process each image in batch
                 for i in range(len(seg_pred)):
-                    self._process_prediction(
+                    self.process_prediction(
                         seg_pred[i],
                         exist_pred[i],
                         img_names[i],
                     )
 
-        print(f"\nPredictions saved to: {self.output_dir}")
+        print(f"\nPredictions saved to: {self.pred_dir}")
+        if self.visualize:
+            print(f"Visualizations saved to: {self.vis_dir}")
         return self.output_dir
 
-    def _process_prediction(
+    def process_prediction(
         self,
         seg_pred: np.ndarray,
         exist_pred: np.ndarray,
@@ -94,10 +112,10 @@ class Evaluator:
         """
         # Get lane coordinates
         exist = [1 if exist_pred[i] > 0.5 else 0 for i in range(4)]
-        lane_coords = self._prob2lines(seg_pred, exist)
+        lane_coords = self.prob2lines(seg_pred, exist)
 
         # Build output path
-        save_path = self._get_save_path(img_name)
+        save_path = self.get_save_path(img_name, self.pred_dir, '.lines.txt')
         save_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Save predictions
@@ -107,7 +125,48 @@ class Evaluator:
                     f.write(f"{x} {y} ")
                 f.write("\n")
 
-    def _prob2lines(
+        # Save visualization
+        if self.visualize and self.vis_count < self.num_visualize:
+            self.save_visualization(seg_pred, exist_pred, img_name)
+            self.vis_count += 1
+
+    def save_visualization(
+        self,
+        seg_pred: np.ndarray,
+        exist_pred: np.ndarray,
+        img_name: str,
+    ) -> None:
+        """
+        Save visualization of prediction.
+
+        Args:
+            seg_pred: Segmentation prediction (5, H, W)
+            exist_pred: Existence prediction (4,)
+            img_name: Original image path
+        """
+        # Load original image
+        img = cv2.imread(img_name)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+        # Resize image to match prediction size
+        pred_h, pred_w = seg_pred.shape[1], seg_pred.shape[2]
+        img_resized = cv2.resize(img, (pred_w, pred_h), interpolation=cv2.INTER_CUBIC)
+
+        # Generate overlay
+        img_overlay, _ = visualize_lanes(img_resized, seg_pred, exist_pred)
+
+        # Create side-by-side image
+        side_by_side = np.concatenate([img_resized, img_overlay], axis=1)
+
+        # Convert to BGR for saving
+        side_by_side = cv2.cvtColor(side_by_side, cv2.COLOR_RGB2BGR)
+
+        # Save visualization
+        save_path = self.get_save_path(img_name, self.vis_dir, '.jpg')
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        cv2.imwrite(str(save_path), side_by_side)
+
+    def prob2lines(
         self,
         seg_pred: np.ndarray,
         exist: list[int],
@@ -143,14 +202,14 @@ class Evaluator:
                 prob_map = cv2.blur(prob_map, (9, 9), borderType=cv2.BORDER_REPLICATE)
 
             # Get lane coordinates
-            coords = self._get_lane_coords(prob_map, h, w, H, W)
+            coords = self.get_lane_coords(prob_map, h, w, H, W)
 
             if len(coords) >= 2:
                 coordinates.append(coords)
 
         return coordinates
 
-    def _get_lane_coords(
+    def get_lane_coords(
         self,
         prob_map: np.ndarray,
         h: int,
@@ -185,20 +244,22 @@ class Evaluator:
 
         return coords
 
-    def _get_save_path(self, img_name: str) -> Path:
+    def get_save_path(self, img_name: str, base_dir: Path, suffix: str) -> Path:
         """
-        Get save path for prediction file.
+        Get save path for output file.
 
         Args:
             img_name: Original image path
+            base_dir: Base directory for saving
+            suffix: File suffix (e.g., '.lines.txt' or '.jpg')
 
         Returns:
-            Path to save prediction file
+            Path to save file
         """
         img_path = Path(img_name)
 
-        # Build output path: output_dir/driver_xxx/xxx/xxx.lines.txt
-        save_name = img_path.stem + '.lines.txt'
-        save_path = self.output_dir / img_path.parts[-3] / img_path.parts[-2] / save_name
+        # Build output path: base_dir/driver_xxx/xxx/xxx{suffix}
+        save_name = img_path.stem + suffix
+        save_path = base_dir / img_path.parts[-3] / img_path.parts[-2] / save_name
 
         return save_path

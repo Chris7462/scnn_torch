@@ -20,21 +20,6 @@ class CULane(Dataset):
         root: Path to CULane dataset root directory
         image_set: One of 'train', 'val', or 'test'
         transforms: Optional albumentations transforms to apply to samples
-
-    Dataset structure expected:
-        root/
-        ├── driver_23_30frame/  # Training & Validation example
-        ├── driver_161_90frame/ # Training example
-        ├── driver_182_30frame/ # Training example
-        ├── driver_37_30frame/  # Test example, no ground truth
-        ├── driver_100_30frame/ # Test example, no ground truth
-        ├── driver_193_90frame/ # Test example, no ground truth
-        ├── laneseg_label_w16/  # Ground truth for training & validation
-        ├── laneseg_label_w16_test/ # No ground truth for test set
-        └── list/
-            ├── train_gt.txt
-            ├── val_gt.txt
-            └── test.txt
     """
 
     def __init__(

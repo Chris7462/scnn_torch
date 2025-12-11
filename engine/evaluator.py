@@ -43,7 +43,7 @@ class Evaluator:
         self.num_visualize = num_visualize
 
         # Output settings
-        self.output_dir = Path(config.get('output_dir', 'output'))
+        self.output_dir = Path(config.get('output_dir', 'outputs'))
         self.pred_dir = self.output_dir / 'predictions'
         self.vis_dir = self.output_dir / 'visualizations'
         self.pred_dir.mkdir(parents=True, exist_ok=True)

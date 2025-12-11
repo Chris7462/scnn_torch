@@ -2,13 +2,14 @@ import argparse
 
 import torch
 import torch.optim as optim
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.data import DataLoader
 
 from datasets import CULane
 from datasets.transforms import get_train_transforms, get_val_transforms
 from model import SCNN
 from model.loss import SCNNLoss
-from engine import Trainer, PolyLR
+from engine import Trainer
 from utils import load_config
 
 
@@ -90,13 +91,13 @@ def build_optimizer(config: dict, model):
 def build_lr_scheduler(config: dict, optimizer):
     """Build learning rate scheduler."""
     scheduler_cfg = config['lr_scheduler']
-    max_iter = config['train']['max_iter']
 
-    scheduler = PolyLR(
+    scheduler = ReduceLROnPlateau(
         optimizer,
-        power=scheduler_cfg['power'],
-        max_iter=max_iter,
-        warmup=scheduler_cfg['warmup'],
+        mode=scheduler_cfg['mode'],
+        factor=scheduler_cfg['factor'],
+        patience=scheduler_cfg['patience'],
+        min_lr=scheduler_cfg['min_lr'],
     )
 
     return scheduler

@@ -156,7 +156,6 @@ class Trainer:
             # Backward pass
             loss.backward()
             self.optimizer.step()
-            self.lr_scheduler.step()
 
             # Update running metrics
             self._update_running_metrics(
@@ -176,6 +175,9 @@ class Trainer:
 
                 # Validate
                 val_metrics = self.validate()
+
+                # Step scheduler with validation loss
+                self.lr_scheduler.step(val_metrics['loss'])
 
                 # Log metrics
                 self.logger.update(cur_iter + 1, train_metrics, val_metrics)

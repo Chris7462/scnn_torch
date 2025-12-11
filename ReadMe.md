@@ -57,7 +57,9 @@ The training is iteration-based. Key settings in `configs/scnn_culane.yaml`:
 | `checkpoint.save_interval` | 2000 | Save checkpoint every N iterations |
 | `logging.print_interval` | 50 | Print training metrics every N iterations |
 | `optimizer.lr` | 0.01 | Base learning rate |
-| `lr_scheduler.power` | 0.9 | Polynomial decay power |
+| `lr_scheduler.patience` | 5 | Reduce LR after N validations without improvement |
+| `lr_scheduler.factor` | 0.5 | LR reduction factor |
+| `lr_scheduler.min_lr` | 0.00001 | Minimum learning rate |
 
 ## Testing
 ```bash

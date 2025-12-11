@@ -3,15 +3,14 @@ from pathlib import Path
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-import numpy as np
 
 
-class TrainLogger:
+class Logger:
     """
     Training logger with history tracking and plotting.
 
     Tracks losses and accuracies during training, prints summaries,
-    and generates training history plots.
+    and generates training history plots. Logs at each validation point.
     """
 
     def __init__(self, log_dir: str | Path) -> None:
@@ -23,6 +22,7 @@ class TrainLogger:
         self.log_dir.mkdir(parents=True, exist_ok=True)
 
         self.history = {
+            'iteration': [],
             'train_loss': [],
             'train_loss_seg': [],
             'train_loss_exist': [],
@@ -37,36 +37,38 @@ class TrainLogger:
 
     def update(
         self,
-        phase: str,
-        loss: float,
-        loss_seg: float,
-        loss_exist: float,
-        seg_acc: float,
-        exist_acc: float,
+        iteration: int,
+        train_metrics: dict,
+        val_metrics: dict,
     ) -> None:
         """
-        Update history with metrics from one epoch.
+        Update history with metrics from one validation point.
 
         Args:
-            phase: 'train' or 'val'
-            loss: Total loss
-            loss_seg: Segmentation loss
-            loss_exist: Existence loss
-            seg_acc: Segmentation accuracy
-            exist_acc: Existence accuracy
+            iteration: Current iteration number
+            train_metrics: Training metrics dict with keys:
+                loss, loss_seg, loss_exist, seg_acc, exist_acc
+            val_metrics: Validation metrics dict with same keys
         """
-        self.history[f'{phase}_loss'].append(loss)
-        self.history[f'{phase}_loss_seg'].append(loss_seg)
-        self.history[f'{phase}_loss_exist'].append(loss_exist)
-        self.history[f'{phase}_seg_acc'].append(seg_acc)
-        self.history[f'{phase}_exist_acc'].append(exist_acc)
+        self.history['iteration'].append(iteration)
+        self.history['train_loss'].append(train_metrics['loss'])
+        self.history['train_loss_seg'].append(train_metrics['loss_seg'])
+        self.history['train_loss_exist'].append(train_metrics['loss_exist'])
+        self.history['train_seg_acc'].append(train_metrics['seg_acc'])
+        self.history['train_exist_acc'].append(train_metrics['exist_acc'])
+        self.history['val_loss'].append(val_metrics['loss'])
+        self.history['val_loss_seg'].append(val_metrics['loss_seg'])
+        self.history['val_loss_exist'].append(val_metrics['loss_exist'])
+        self.history['val_seg_acc'].append(val_metrics['seg_acc'])
+        self.history['val_exist_acc'].append(val_metrics['exist_acc'])
 
-    def print_epoch(self, epoch: int, lr: float) -> None:
+    def print_iteration(self, iteration: int, max_iter: int, lr: float) -> None:
         """
-        Print epoch summary to screen.
+        Print iteration summary to screen.
 
         Args:
-            epoch: Current epoch number
+            iteration: Current iteration number
+            max_iter: Maximum iterations
             lr: Current learning rate
         """
         train_loss = self.history['train_loss'][-1]
@@ -81,7 +83,7 @@ class TrainLogger:
         val_seg_acc = self.history['val_seg_acc'][-1]
         val_exist_acc = self.history['val_exist_acc'][-1]
 
-        print(f"\nEpoch {epoch} Summary:")
+        print(f"\nIteration {iteration}/{max_iter} Summary:")
         print(f"  LR: {lr:.6f}")
         print(f"  Train - Loss: {train_loss:.4f} (seg: {train_loss_seg:.4f}, exist: {train_loss_exist:.4f}), "
               f"Seg Acc: {train_seg_acc:.4f}, Exist Acc: {train_exist_acc:.4f}")
@@ -99,53 +101,52 @@ class TrainLogger:
 
         fig, axes = plt.subplots(2, 2, figsize=(14, 10))
 
-        num_epochs = len(self.history['train_loss'])
-        epochs_range = np.arange(1, num_epochs + 1)
+        iterations = self.history['iteration']
 
         # Plot 1: Total Loss
-        axes[0, 0].plot(epochs_range, self.history['train_loss'], label='Train',
+        axes[0, 0].plot(iterations, self.history['train_loss'], label='Train',
                         marker='o', markersize=3, linewidth=2)
-        axes[0, 0].plot(epochs_range, self.history['val_loss'], label='Val',
+        axes[0, 0].plot(iterations, self.history['val_loss'], label='Val',
                         marker='s', markersize=3, linewidth=2)
         axes[0, 0].set_title('Total Loss', fontsize=14, fontweight='bold')
-        axes[0, 0].set_xlabel('Epoch', fontsize=12)
+        axes[0, 0].set_xlabel('Iteration', fontsize=12)
         axes[0, 0].set_ylabel('Loss', fontsize=12)
         axes[0, 0].legend(fontsize=11)
         axes[0, 0].grid(True, alpha=0.3)
 
         # Plot 2: Seg Loss & Exist Loss
-        axes[0, 1].plot(epochs_range, self.history['train_loss_seg'], label='Train Seg',
+        axes[0, 1].plot(iterations, self.history['train_loss_seg'], label='Train Seg',
                         marker='o', markersize=3, linewidth=2)
-        axes[0, 1].plot(epochs_range, self.history['val_loss_seg'], label='Val Seg',
+        axes[0, 1].plot(iterations, self.history['val_loss_seg'], label='Val Seg',
                         marker='s', markersize=3, linewidth=2)
-        axes[0, 1].plot(epochs_range, self.history['train_loss_exist'], label='Train Exist',
+        axes[0, 1].plot(iterations, self.history['train_loss_exist'], label='Train Exist',
                         marker='o', markersize=3, linewidth=2, linestyle='--')
-        axes[0, 1].plot(epochs_range, self.history['val_loss_exist'], label='Val Exist',
+        axes[0, 1].plot(iterations, self.history['val_loss_exist'], label='Val Exist',
                         marker='s', markersize=3, linewidth=2, linestyle='--')
         axes[0, 1].set_title('Segmentation & Existence Loss', fontsize=14, fontweight='bold')
-        axes[0, 1].set_xlabel('Epoch', fontsize=12)
+        axes[0, 1].set_xlabel('Iteration', fontsize=12)
         axes[0, 1].set_ylabel('Loss', fontsize=12)
         axes[0, 1].legend(fontsize=11)
         axes[0, 1].grid(True, alpha=0.3)
 
         # Plot 3: Seg Accuracy
-        axes[1, 0].plot(epochs_range, self.history['train_seg_acc'], label='Train',
+        axes[1, 0].plot(iterations, self.history['train_seg_acc'], label='Train',
                         marker='o', markersize=3, linewidth=2)
-        axes[1, 0].plot(epochs_range, self.history['val_seg_acc'], label='Val',
+        axes[1, 0].plot(iterations, self.history['val_seg_acc'], label='Val',
                         marker='s', markersize=3, linewidth=2)
         axes[1, 0].set_title('Segmentation Accuracy', fontsize=14, fontweight='bold')
-        axes[1, 0].set_xlabel('Epoch', fontsize=12)
+        axes[1, 0].set_xlabel('Iteration', fontsize=12)
         axes[1, 0].set_ylabel('Accuracy', fontsize=12)
         axes[1, 0].legend(fontsize=11)
         axes[1, 0].grid(True, alpha=0.3)
 
         # Plot 4: Exist Accuracy
-        axes[1, 1].plot(epochs_range, self.history['train_exist_acc'], label='Train',
+        axes[1, 1].plot(iterations, self.history['train_exist_acc'], label='Train',
                         marker='o', markersize=3, linewidth=2)
-        axes[1, 1].plot(epochs_range, self.history['val_exist_acc'], label='Val',
+        axes[1, 1].plot(iterations, self.history['val_exist_acc'], label='Val',
                         marker='s', markersize=3, linewidth=2)
         axes[1, 1].set_title('Existence Accuracy', fontsize=14, fontweight='bold')
-        axes[1, 1].set_xlabel('Epoch', fontsize=12)
+        axes[1, 1].set_xlabel('Iteration', fontsize=12)
         axes[1, 1].set_ylabel('Accuracy', fontsize=12)
         axes[1, 1].legend(fontsize=11)
         axes[1, 1].grid(True, alpha=0.3)

@@ -18,7 +18,7 @@ dataloader:
 
 # Training
 train:
-  epochs: 30
+  max_iter: 90000
   rotation: 2  # Rotation augmentation angle
 
 # Optimizer
@@ -26,15 +26,14 @@ optimizer:
   type: SGD
   lr: 0.16
   momentum: 0.9
-  weight_decay: 0.001
+  weight_decay: 0.0001
   nesterov: true
 
 # Learning rate scheduler
 lr_scheduler:
   type: PolyLR
   power: 0.9
-  warmup: 50
-  max_iter: 8000
+  warmup: 500
 
 # Loss
 loss:
@@ -47,14 +46,18 @@ normalize:
   mean: [0.485, 0.456, 0.406]
   std: [0.229, 0.224, 0.225]
 
+# Validation
+validation:
+  interval: 2000
+
 # Checkpoints
 checkpoint:
   save_dir: checkpoints
-  save_interval: 1  # Save every N epochs
+  save_interval: 2000
 
 # Logging
 logging:
-  print_interval: 20  # Print every N iterations
+  print_interval: 50  # Print every N iterations
 
 # Evaluation
 evaluation:

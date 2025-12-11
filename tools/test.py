@@ -81,7 +81,7 @@ def load_checkpoint(model, checkpoint_path: str, device: torch.device):
     else:
         model.load_state_dict(checkpoint['net'])
 
-    print(f"  Loaded from epoch {checkpoint['epoch'] + 1}")
+    print(f"  Loaded from iteration {checkpoint['iteration']}")
     return model
 
 

@@ -49,6 +49,7 @@ def build_dataloader(config: dict, image_set: str, transforms):
         num_workers=config['dataloader']['num_workers'],
         collate_fn=dataset.collate,
         pin_memory=True,
+        drop_last=(image_set == 'train'),
     )
 
     return dataloader
@@ -86,12 +87,10 @@ def build_optimizer(config: dict, model):
     return optimizer
 
 
-def build_lr_scheduler(config: dict, optimizer, steps_per_epoch: int):
+def build_lr_scheduler(config: dict, optimizer):
     """Build learning rate scheduler."""
     scheduler_cfg = config['lr_scheduler']
-
-    # Calculate max_iter if not specified
-    max_iter = scheduler_cfg.get('max_iter', config['train']['epochs'] * steps_per_epoch)
+    max_iter = config['train']['max_iter']
 
     scheduler = PolyLR(
         optimizer,
@@ -147,7 +146,7 @@ def main():
     optimizer = build_optimizer(config, model)
 
     # Build lr scheduler
-    lr_scheduler = build_lr_scheduler(config, optimizer, len(train_loader))
+    lr_scheduler = build_lr_scheduler(config, optimizer)
 
     # Build criterion
     criterion = build_criterion(config, device)
@@ -170,6 +169,9 @@ def main():
 
     # Train
     print("\nStarting training...")
+    print(f"  Max iterations: {config['train']['max_iter']}")
+    print(f"  Validation interval: {config['validation']['interval']}")
+    print(f"  Checkpoint interval: {config['checkpoint']['save_interval']}")
     trainer.train()
 
 

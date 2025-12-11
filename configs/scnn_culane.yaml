@@ -24,7 +24,7 @@ train:
 # Optimizer
 optimizer:
   type: SGD
-  lr: 0.01
+  lr: 0.16
   momentum: 0.9
   weight_decay: 0.0001
   nesterov: true
@@ -33,7 +33,7 @@ optimizer:
 lr_scheduler:
   type: PolyLR
   power: 0.9
-  warmup: 0
+  warmup: 500
 
 # Loss
 loss:
@@ -57,7 +57,7 @@ checkpoint:
 
 # Logging
 logging:
-  print_interval: 20  # Print every N iterations
+  print_interval: 50  # Print every N iterations
 
 # Evaluation
 evaluation:

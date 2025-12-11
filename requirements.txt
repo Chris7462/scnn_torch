@@ -12,6 +12,3 @@ pyyaml
 
 # Logging and visualization
 matplotlib
-
-# Progress bar
-tqdm

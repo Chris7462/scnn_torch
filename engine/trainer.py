@@ -2,7 +2,6 @@ from pathlib import Path
 
 import torch
 import torch.nn as nn
-from tqdm import tqdm
 
 from utils import Logger
 
@@ -116,14 +115,25 @@ class Trainer:
             'exist_acc': self.running_exist_correct / self.running_exist_samples,
         }
 
+    def _print_training_metrics(self, cur_iter: int, loss: float, loss_seg: float, loss_exist: float) -> None:
+        """Print current training metrics."""
+        lr = self.optimizer.param_groups[0]['lr']
+        metrics = self._get_running_metrics()
+
+        print(
+            f"Iter [{cur_iter + 1}/{self.max_iter}] "
+            f"LR: {lr:.6f} | "
+            f"Loss: {loss:.4f} (seg: {loss_seg:.4f}, exist: {loss_exist:.4f}) | "
+            f"Seg Acc: {metrics['seg_acc']:.4f}, Exist Acc: {metrics['exist_acc']:.4f}"
+        )
+
     def train(self) -> None:
         """Main training loop over all iterations."""
         train_iter = iter(infinite_loader(self.train_loader))
 
         self.model.train()
-        pbar = tqdm(range(self.start_iter, self.max_iter), desc="Training", initial=self.start_iter, total=self.max_iter)
 
-        for cur_iter in pbar:
+        for cur_iter in range(self.start_iter, self.max_iter):
             # Get next batch
             sample = next(train_iter)
             img = sample['img'].to(self.device)
@@ -154,12 +164,9 @@ class Trainer:
                 seg_pred, exist_pred, seg_gt, exist_gt
             )
 
-            # Update progress bar
+            # Print training metrics
             if (cur_iter + 1) % self.print_interval == 0:
-                pbar.set_postfix({
-                    'loss': f"{loss.item():.4f}",
-                    'lr': f"{self.optimizer.param_groups[0]['lr']:.6f}"
-                })
+                self._print_training_metrics(cur_iter, loss.item(), loss_seg.item(), loss_exist.item())
 
             # Validation and checkpoint at intervals
             if (cur_iter + 1) % self.val_interval == 0:
@@ -210,8 +217,11 @@ class Trainer:
         total_exist_correct = 0
         total_exist_samples = 0
 
+        num_batches = len(self.val_loader)
+        print(f"Validating... ({num_batches} batches)")
+
         with torch.no_grad():
-            for sample in tqdm(self.val_loader, desc="Validating", leave=False):
+            for sample in self.val_loader:
                 img = sample['img'].to(self.device)
                 seg_gt = sample['seg_label'].to(self.device)
                 exist_gt = sample['exist'].to(self.device)
@@ -243,8 +253,6 @@ class Trainer:
                 exist_pred_binary = (torch.sigmoid(exist_pred) > 0.5).float()
                 total_exist_correct += (exist_pred_binary == exist_gt).sum().item()
                 total_exist_samples += exist_gt.numel()
-
-        num_batches = len(self.val_loader)
 
         return {
             'loss': total_loss / num_batches,

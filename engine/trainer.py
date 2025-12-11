@@ -4,7 +4,13 @@ import torch
 import torch.nn as nn
 from tqdm import tqdm
 
-from utils import TrainLogger
+from utils import Logger
+
+
+def infinite_loader(loader):
+    """Get an infinite stream of batches from a data loader."""
+    while True:
+        yield from loader
 
 
 class Trainer:
@@ -43,7 +49,9 @@ class Trainer:
         self.device = device
 
         # Training settings
-        self.epochs = config['train']['epochs']
+        self.max_iter = config['train']['max_iter']
+        self.val_interval = config['validation']['interval']
+        self.print_interval = config['logging']['print_interval']
 
         # Checkpoint settings
         self.save_dir = Path(config['checkpoint']['save_dir'])
@@ -51,60 +59,73 @@ class Trainer:
         self.save_dir.mkdir(parents=True, exist_ok=True)
 
         # Logger
-        self.logger = TrainLogger(self.save_dir)
+        self.logger = Logger(self.save_dir)
 
         # Training state
-        self.start_epoch = 0
+        self.start_iter = 0
         self.best_val_loss = float('inf')
 
+        # Running metrics for training (accumulated between validations)
+        self._reset_running_metrics()
+
+    def _reset_running_metrics(self) -> None:
+        """Reset running metrics for training."""
+        self.running_loss = 0.0
+        self.running_loss_seg = 0.0
+        self.running_loss_exist = 0.0
+        self.running_seg_correct = 0
+        self.running_seg_pixels = 0
+        self.running_exist_correct = 0
+        self.running_exist_samples = 0
+        self.running_count = 0
+
+    def _update_running_metrics(
+        self,
+        loss: float,
+        loss_seg: float,
+        loss_exist: float,
+        seg_pred: torch.Tensor,
+        exist_pred: torch.Tensor,
+        seg_gt: torch.Tensor,
+        exist_gt: torch.Tensor,
+    ) -> None:
+        """Update running metrics with current batch."""
+        self.running_loss += loss
+        self.running_loss_seg += loss_seg
+        self.running_loss_exist += loss_exist
+        self.running_count += 1
+
+        with torch.no_grad():
+            # Segmentation accuracy
+            seg_pred_class = seg_pred.argmax(dim=1)
+            self.running_seg_correct += (seg_pred_class == seg_gt).sum().item()
+            self.running_seg_pixels += seg_gt.numel()
+
+            # Existence accuracy
+            exist_pred_binary = (torch.sigmoid(exist_pred) > 0.5).float()
+            self.running_exist_correct += (exist_pred_binary == exist_gt).sum().item()
+            self.running_exist_samples += exist_gt.numel()
+
+    def _get_running_metrics(self) -> dict:
+        """Get averaged running metrics."""
+        return {
+            'loss': self.running_loss / self.running_count,
+            'loss_seg': self.running_loss_seg / self.running_count,
+            'loss_exist': self.running_loss_exist / self.running_count,
+            'seg_acc': self.running_seg_correct / self.running_seg_pixels,
+            'exist_acc': self.running_exist_correct / self.running_exist_samples,
+        }
+
     def train(self) -> None:
-        """Main training loop over all epochs."""
-        for epoch in range(self.start_epoch, self.epochs):
-            print(f"\nEpoch {epoch + 1}/{self.epochs}")
+        """Main training loop over all iterations."""
+        train_iter = iter(infinite_loader(self.train_loader))
 
-            # Train one epoch
-            train_metrics = self.train_one_epoch()
-            self.logger.update('train', **train_metrics)
-
-            # Validate
-            val_metrics = self.validate()
-            self.logger.update('val', **val_metrics)
-
-            # Print epoch summary
-            lr = self.optimizer.param_groups[0]['lr']
-            self.logger.print_epoch(epoch + 1, lr)
-
-            # Plot training history
-            self.logger.plot()
-
-            # Save checkpoint
-            if (epoch + 1) % self.save_interval == 0:
-                self.save_checkpoint(epoch)
-
-            # Save best model
-            val_loss = val_metrics['loss']
-            if val_loss < self.best_val_loss:
-                self.best_val_loss = val_loss
-                self.save_checkpoint(epoch, is_best=True)
-                print(f"Best model saved! (loss: {val_loss:.4f})")
-
-            print("-" * 60)
-
-        print("\nTraining completed!")
-
-    def train_one_epoch(self) -> dict:
-        """Training logic for one epoch."""
         self.model.train()
+        pbar = tqdm(range(self.start_iter, self.max_iter), desc="Training", initial=self.start_iter, total=self.max_iter)
 
-        total_loss = 0
-        total_loss_seg = 0
-        total_loss_exist = 0
-        total_seg_correct = 0
-        total_seg_pixels = 0
-        total_exist_correct = 0
-        total_exist_samples = 0
-
-        for sample in tqdm(self.train_loader, desc="Training"):
+        for cur_iter in pbar:
+            # Get next batch
+            sample = next(train_iter)
             img = sample['img'].to(self.device)
             seg_gt = sample['seg_label'].to(self.device)
             exist_gt = sample['exist'].to(self.device)
@@ -127,32 +148,55 @@ class Trainer:
             self.optimizer.step()
             self.lr_scheduler.step()
 
-            # Accumulate losses
-            total_loss += loss.item()
-            total_loss_seg += loss_seg.item()
-            total_loss_exist += loss_exist.item()
+            # Update running metrics
+            self._update_running_metrics(
+                loss.item(), loss_seg.item(), loss_exist.item(),
+                seg_pred, exist_pred, seg_gt, exist_gt
+            )
 
-            # Accumulate accuracy metrics
-            with torch.no_grad():
-                # Segmentation accuracy
-                seg_pred_class = seg_pred.argmax(dim=1)
-                total_seg_correct += (seg_pred_class == seg_gt).sum().item()
-                total_seg_pixels += seg_gt.numel()
+            # Update progress bar
+            if (cur_iter + 1) % self.print_interval == 0:
+                pbar.set_postfix({
+                    'loss': f"{loss.item():.4f}",
+                    'lr': f"{self.optimizer.param_groups[0]['lr']:.6f}"
+                })
 
-                # Existence accuracy
-                exist_pred_binary = (torch.sigmoid(exist_pred) > 0.5).float()
-                total_exist_correct += (exist_pred_binary == exist_gt).sum().item()
-                total_exist_samples += exist_gt.numel()
+            # Validation and checkpoint at intervals
+            if (cur_iter + 1) % self.val_interval == 0:
+                # Get training metrics
+                train_metrics = self._get_running_metrics()
+                self._reset_running_metrics()
 
-        num_batches = len(self.train_loader)
+                # Validate
+                val_metrics = self.validate()
 
-        return {
-            'loss': total_loss / num_batches,
-            'loss_seg': total_loss_seg / num_batches,
-            'loss_exist': total_loss_exist / num_batches,
-            'seg_acc': total_seg_correct / total_seg_pixels,
-            'exist_acc': total_exist_correct / total_exist_samples,
-        }
+                # Log metrics
+                self.logger.update(cur_iter + 1, train_metrics, val_metrics)
+
+                # Print summary
+                lr = self.optimizer.param_groups[0]['lr']
+                self.logger.print_iteration(cur_iter + 1, self.max_iter, lr)
+
+                # Plot training history
+                self.logger.plot()
+
+                # Save checkpoint
+                if (cur_iter + 1) % self.save_interval == 0:
+                    self.save_checkpoint(cur_iter + 1)
+
+                # Save best model
+                val_loss = val_metrics['loss']
+                if val_loss < self.best_val_loss:
+                    self.best_val_loss = val_loss
+                    self.save_checkpoint(cur_iter + 1, is_best=True)
+                    print(f"Best model saved! (loss: {val_loss:.4f})")
+
+                print("-" * 60)
+
+                # Switch back to training mode
+                self.model.train()
+
+        print("\nTraining completed!")
 
     def validate(self) -> dict:
         """Validation logic."""
@@ -167,7 +211,7 @@ class Trainer:
         total_exist_samples = 0
 
         with torch.no_grad():
-            for sample in tqdm(self.val_loader, desc="Validating"):
+            for sample in tqdm(self.val_loader, desc="Validating", leave=False):
                 img = sample['img'].to(self.device)
                 seg_gt = sample['seg_label'].to(self.device)
                 exist_gt = sample['exist'].to(self.device)
@@ -210,16 +254,16 @@ class Trainer:
             'exist_acc': total_exist_correct / total_exist_samples,
         }
 
-    def save_checkpoint(self, epoch: int, is_best: bool = False) -> None:
+    def save_checkpoint(self, iteration: int, is_best: bool = False) -> None:
         """
         Save model checkpoint.
 
         Args:
-            epoch: Current epoch number
+            iteration: Current iteration number
             is_best: Whether this is the best model so far
         """
         state = {
-            'epoch': epoch,
+            'iteration': iteration,
             'net': self.model.module.state_dict() if isinstance(self.model, nn.DataParallel) else self.model.state_dict(),
             'optimizer': self.optimizer.state_dict(),
             'lr_scheduler': self.lr_scheduler.state_dict(),
@@ -257,11 +301,11 @@ class Trainer:
         self.lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
 
         # Restore training state
-        self.start_epoch = checkpoint['epoch'] + 1
+        self.start_iter = checkpoint['iteration']
         self.best_val_loss = checkpoint.get('best_val_loss', float('inf'))
 
         # Restore history
         if 'history' in checkpoint:
             self.logger.set_history(checkpoint['history'])
 
-        print(f"  Resumed from epoch {checkpoint['epoch'] + 1}")
+        print(f"  Resumed from iteration {checkpoint['iteration']}")

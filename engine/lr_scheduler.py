@@ -4,20 +4,20 @@ from torch.optim.lr_scheduler import LRScheduler
 
 class PolyLR(LRScheduler):
     """
-    Polynomial learning rate scheduler with warmup.
+    Polynomial learning rate scheduler with optional warmup.
 
     Learning rate is decayed using polynomial function:
         lr = (base_lr - min_lr) * (1 - iter/max_iter)^power + min_lr
 
-    During warmup, learning rate linearly increases from 0 to base_lr.
+    During warmup (if enabled), learning rate linearly increases from 0 to base_lr.
 
     Args:
         optimizer: Wrapped optimizer
         power: Power of polynomial decay
         max_iter: Maximum number of iterations
         min_lr: Minimum learning rate (can be single value or list for each param group)
-        warmup: Number of warmup iterations
-        last_epoch: Index of last epoch (for resuming)
+        warmup: Number of warmup iterations (0 to disable)
+        last_epoch: Index of last iteration (for resuming)
     """
 
     def __init__(

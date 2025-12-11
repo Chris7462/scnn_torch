@@ -46,6 +46,18 @@ Training outputs:
 - Checkpoints saved to `checkpoints/` (configurable in config file)
 - Training history plot saved as `training_history.png`
 
+### Training Configuration
+
+The training is iteration-based. Key settings in `configs/scnn_culane.yaml`:
+
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| `train.max_iter` | 90000 | Total training iterations |
+| `validation.interval` | 2000 | Validate every N iterations |
+| `checkpoint.save_interval` | 2000 | Save checkpoint every N iterations |
+| `optimizer.lr` | 0.01 | Base learning rate |
+| `lr_scheduler.power` | 0.9 | Polynomial decay power |
+
 ## Testing
 ```bash
 python tools/test.py --config configs/scnn_culane.yaml --checkpoint checkpoints/best.pth

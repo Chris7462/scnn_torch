@@ -1,13 +1,10 @@
 from pathlib import Path
-import time
 
 import torch
 import torch.nn as nn
-from torch import Tensor
 from tqdm import tqdm
 
-from utils.tensorboard import TensorBoard
-from utils.visualization import prepare_visualization_batch
+from utils import TrainLogger
 
 
 class Trainer:
@@ -53,43 +50,59 @@ class Trainer:
         self.save_interval = config['checkpoint']['save_interval']
         self.save_dir.mkdir(parents=True, exist_ok=True)
 
-        # TensorBoard
-        self.tensorboard = TensorBoard(str(self.save_dir))
-
-        # Visualization settings
-        self.resize_shape = tuple(config['dataset']['resize_shape'])
+        # Logger
+        self.logger = TrainLogger(self.save_dir)
 
         # Training state
         self.start_epoch = 0
         self.best_val_loss = float('inf')
-        self.global_step = 0
 
     def train(self) -> None:
         """Main training loop over all epochs."""
         for epoch in range(self.start_epoch, self.epochs):
-            print(f"\nTrain Epoch: {epoch}")
+            print(f"\nEpoch {epoch + 1}/{self.epochs}")
 
             # Train one epoch
-            self.train_one_epoch()
+            train_metrics = self.train_one_epoch()
+            self.logger.update('train', **train_metrics)
 
             # Validate
-            if self.val_loader is not None:
-                print(f"\nValidation For Experiment: {self.save_dir}")
-                print(time.strftime('%H:%M:%S', time.localtime()))
-                self.validate(epoch)
+            val_metrics = self.validate()
+            self.logger.update('val', **val_metrics)
+
+            # Print epoch summary
+            lr = self.optimizer.param_groups[0]['lr']
+            self.logger.print_epoch(epoch + 1, lr)
+
+            # Plot training history
+            self.logger.plot()
 
             # Save checkpoint
             if (epoch + 1) % self.save_interval == 0:
                 self.save_checkpoint(epoch)
 
-            print("------------------------\n")
+            # Save best model
+            val_loss = val_metrics['loss']
+            if val_loss < self.best_val_loss:
+                self.best_val_loss = val_loss
+                self.save_checkpoint(epoch, is_best=True)
+                print(f"Best model saved! (loss: {val_loss:.4f})")
 
-        self.tensorboard.close()
-        print("Training completed!")
+            print("-" * 60)
 
-    def train_one_epoch(self) -> None:
+        print("\nTraining completed!")
+
+    def train_one_epoch(self) -> dict:
         """Training logic for one epoch."""
         self.model.train()
+
+        total_loss = 0
+        total_loss_seg = 0
+        total_loss_exist = 0
+        total_seg_correct = 0
+        total_seg_pixels = 0
+        total_exist_correct = 0
+        total_exist_samples = 0
 
         for sample in tqdm(self.train_loader, desc="Training"):
             img = sample['img'].to(self.device)
@@ -114,33 +127,47 @@ class Trainer:
             self.optimizer.step()
             self.lr_scheduler.step()
 
-            # Update global step
-            self.global_step += 1
+            # Accumulate losses
+            total_loss += loss.item()
+            total_loss_seg += loss_seg.item()
+            total_loss_exist += loss_exist.item()
 
-            # TensorBoard logging
-            lr = self.optimizer.param_groups[0]['lr']
-            self.tensorboard.scalar_summary('train/loss', loss.item(), self.global_step)
-            self.tensorboard.scalar_summary('train/loss_seg', loss_seg.item(), self.global_step)
-            self.tensorboard.scalar_summary('train/loss_exist', loss_exist.item(), self.global_step)
-            self.tensorboard.scalar_summary('train/lr', lr, self.global_step)
+            # Accumulate accuracy metrics
+            with torch.no_grad():
+                # Segmentation accuracy
+                seg_pred_class = seg_pred.argmax(dim=1)
+                total_seg_correct += (seg_pred_class == seg_gt).sum().item()
+                total_seg_pixels += seg_gt.numel()
 
-        self.tensorboard.flush()
+                # Existence accuracy
+                exist_pred_binary = (torch.sigmoid(exist_pred) > 0.5).float()
+                total_exist_correct += (exist_pred_binary == exist_gt).sum().item()
+                total_exist_samples += exist_gt.numel()
 
-    def validate(self, epoch: int) -> None:
-        """
-        Validation logic.
+        num_batches = len(self.train_loader)
 
-        Args:
-            epoch: Current epoch number
-        """
+        return {
+            'loss': total_loss / num_batches,
+            'loss_seg': total_loss_seg / num_batches,
+            'loss_exist': total_loss_exist / num_batches,
+            'seg_acc': total_seg_correct / total_seg_pixels,
+            'exist_acc': total_exist_correct / total_exist_samples,
+        }
+
+    def validate(self) -> dict:
+        """Validation logic."""
         self.model.eval()
 
-        val_loss = 0
-        val_loss_seg = 0
-        val_loss_exist = 0
+        total_loss = 0
+        total_loss_seg = 0
+        total_loss_exist = 0
+        total_seg_correct = 0
+        total_seg_pixels = 0
+        total_exist_correct = 0
+        total_exist_samples = 0
 
         with torch.no_grad():
-            for batch_idx, sample in enumerate(tqdm(self.val_loader, desc="Validating")):
+            for sample in tqdm(self.val_loader, desc="Validating"):
                 img = sample['img'].to(self.device)
                 seg_gt = sample['seg_label'].to(self.device)
                 exist_gt = sample['exist'].to(self.device)
@@ -157,59 +184,31 @@ class Trainer:
                     loss_seg = loss_seg.mean()
                     loss_exist = loss_exist.mean()
 
-                val_loss += loss.item()
-                val_loss_seg += loss_seg.item()
-                val_loss_exist += loss_exist.item()
+                # Accumulate losses
+                total_loss += loss.item()
+                total_loss_seg += loss_seg.item()
+                total_loss_exist += loss_exist.item()
 
-                # Visualize first few batches
-                if batch_idx < 5:
-                    self._visualize_batch(sample, seg_pred, exist_pred, epoch, batch_idx)
+                # Accumulate accuracy metrics
+                # Segmentation accuracy
+                seg_pred_class = seg_pred.argmax(dim=1)
+                total_seg_correct += (seg_pred_class == seg_gt).sum().item()
+                total_seg_pixels += seg_gt.numel()
 
-        # TensorBoard logging
-        val_step = (epoch + 1) * len(self.train_loader)
-        self.tensorboard.scalar_summary('val/loss', val_loss, val_step)
-        self.tensorboard.scalar_summary('val/loss_seg', val_loss_seg, val_step)
-        self.tensorboard.scalar_summary('val/loss_exist', val_loss_exist, val_step)
-        self.tensorboard.flush()
+                # Existence accuracy
+                exist_pred_binary = (torch.sigmoid(exist_pred) > 0.5).float()
+                total_exist_correct += (exist_pred_binary == exist_gt).sum().item()
+                total_exist_samples += exist_gt.numel()
 
-        # Save best model
-        if val_loss < self.best_val_loss:
-            self.best_val_loss = val_loss
-            self.save_checkpoint(epoch, is_best=True)
-            print(f"New best model saved! (loss: {val_loss:.4f})")
+        num_batches = len(self.val_loader)
 
-        print("------------------------\n")
-
-    def _visualize_batch(
-        self,
-        sample: dict,
-        seg_pred: Tensor,
-        exist_pred: Tensor,
-        epoch: int,
-        batch_idx: int,
-    ) -> None:
-        """
-        Visualize predictions for a batch.
-
-        Args:
-            sample: Input sample dictionary
-            seg_pred: Segmentation predictions
-            exist_pred: Existence predictions
-            epoch: Current epoch
-            batch_idx: Current batch index
-        """
-        seg_pred_np = seg_pred.detach().cpu().numpy()
-        exist_pred_np = torch.sigmoid(exist_pred).detach().cpu().numpy()
-        img_names = sample['img_name']
-
-        vis_imgs = prepare_visualization_batch(
-            imgs=img_names,
-            seg_preds=seg_pred_np,
-            exist_preds=exist_pred_np,
-            resize_shape=self.resize_shape,
-        )
-
-        self.tensorboard.image_summary(f'val/batch_{batch_idx}', vis_imgs, epoch)
+        return {
+            'loss': total_loss / num_batches,
+            'loss_seg': total_loss_seg / num_batches,
+            'loss_exist': total_loss_exist / num_batches,
+            'seg_acc': total_seg_correct / total_seg_pixels,
+            'exist_acc': total_exist_correct / total_exist_samples,
+        }
 
     def save_checkpoint(self, epoch: int, is_best: bool = False) -> None:
         """
@@ -225,12 +224,12 @@ class Trainer:
             'optimizer': self.optimizer.state_dict(),
             'lr_scheduler': self.lr_scheduler.state_dict(),
             'best_val_loss': self.best_val_loss,
+            'history': self.logger.get_history(),
         }
 
         # Save latest checkpoint
         save_path = self.save_dir / 'latest.pth'
         torch.save(state, save_path)
-        print(f"  Checkpoint saved: {save_path}")
 
         # Save best checkpoint
         if is_best:
@@ -260,6 +259,9 @@ class Trainer:
         # Restore training state
         self.start_epoch = checkpoint['epoch'] + 1
         self.best_val_loss = checkpoint.get('best_val_loss', float('inf'))
-        self.global_step = self.start_epoch * len(self.train_loader)
 
-        print(f"From Epoch: {checkpoint['epoch']}")
+        # Restore history
+        if 'history' in checkpoint:
+            self.logger.set_history(checkpoint['history'])
+
+        print(f"  Resumed from epoch {checkpoint['epoch'] + 1}")

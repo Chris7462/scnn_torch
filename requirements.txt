@@ -10,8 +10,8 @@ albumentations
 # Configuration
 pyyaml
 
-# Logging
-tensorboard
+# Logging and visualization
+matplotlib
 
 # Progress bar
 tqdm

@@ -6,7 +6,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
-from tqdm import tqdm
 
 from utils.visualization import visualize_lanes
 
@@ -43,7 +42,7 @@ class Evaluator:
         self.num_visualize = num_visualize
 
         # Output settings
-        self.output_dir = Path(config.get('output_dir', 'output'))
+        self.output_dir = Path(config.get('output_dir', 'outputs'))
         self.pred_dir = self.output_dir / 'predictions'
         self.vis_dir = self.output_dir / 'visualizations'
         self.pred_dir.mkdir(parents=True, exist_ok=True)
@@ -69,8 +68,11 @@ class Evaluator:
         """
         self.model.eval()
 
+        num_batches = len(self.test_loader)
+        print(f"Evaluating... ({num_batches} batches)")
+
         with torch.no_grad():
-            for sample in tqdm(self.test_loader, desc="Evaluating"):
+            for batch_idx, sample in enumerate(self.test_loader):
                 img = sample['img'].to(self.device)
                 img_names = sample['img_name']
 
@@ -90,6 +92,10 @@ class Evaluator:
                         exist_pred[i],
                         img_names[i],
                     )
+
+                # Print progress every 100 batches
+                if (batch_idx + 1) % 100 == 0:
+                    print(f"  Processed {batch_idx + 1}/{num_batches} batches")
 
         print(f"\nPredictions saved to: {self.pred_dir}")
         if self.visualize:

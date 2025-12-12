@@ -35,6 +35,7 @@ class ExistHead(nn.Module):
         )
 
         self.fc = nn.Sequential(
+            nn.Flatten(),
             nn.Linear(fc_input_features, 128),
             nn.ReLU(inplace=True),
             nn.Linear(128, num_lanes),
@@ -49,6 +50,5 @@ class ExistHead(nn.Module):
             Existence logits of shape (B, 4)
         """
         x = self.pool(x)
-        x = x.view(x.size(0), -1)
         x = self.fc(x)
         return x

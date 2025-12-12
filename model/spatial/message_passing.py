@@ -21,11 +21,11 @@ class MessagePassing(nn.Module):
     def __init__(self, channels: int = 128, kernel_size: int = 9) -> None:
         super().__init__()
 
-        # Vertical convolutions: kernel (1, k) - wide to capture lane width
+        # Vertical propagation: kernel (1, k) captures horizontal context at each row for lane width
         self.conv_down = nn.Conv2d(channels, channels, (1, kernel_size), padding=(0, kernel_size // 2), bias=False)
         self.conv_up = nn.Conv2d(channels, channels, (1, kernel_size), padding=(0, kernel_size // 2), bias=False)
 
-        # Horizontal convolutions: kernel (k, 1) - tall to capture lane height
+        # Horizontal propagation: kernel (k, 1) captures vertical context at each column for lane height
         self.conv_right = nn.Conv2d(channels, channels, (kernel_size, 1), padding=(kernel_size // 2, 0), bias=False)
         self.conv_left = nn.Conv2d(channels, channels, (kernel_size, 1), padding=(kernel_size // 2, 0), bias=False)
 

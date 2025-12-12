@@ -73,7 +73,7 @@ class SCNN(nn.Module):
 
         Returns:
             seg_pred: Segmentation logits of shape (B, 5, H, W)
-            exist_pred: Existence probabilities of shape (B, 4)
+            exist_pred: Existence logits of shape (B, 4)
         """
         x = self.backbone(x)
         x = self.scnn_neck(x)
@@ -87,7 +87,7 @@ class SCNN(nn.Module):
 
     def _initialize_weights(self) -> None:
         """
-        Initialize model weights using best practices.
+        Initialize model weights.
 
         Applies:
         - Kaiming normal initialization for Conv2d layers (optimal for ReLU)

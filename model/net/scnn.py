@@ -63,8 +63,7 @@ class SCNN(nn.Module):
         self.seg_head = SegHead(upsample_scale=8)
         self.exist_head = ExistHead(in_channels=5, input_height=feature_height, input_width=feature_width)
 
-        if not pretrained:
-            self._initialize_weights()
+        self._initialize_weights(pretrained)
 
     def forward(self, x: Tensor) -> tuple[Tensor, Tensor]:
         """
@@ -73,7 +72,7 @@ class SCNN(nn.Module):
 
         Returns:
             seg_pred: Segmentation logits of shape (B, 5, H, W)
-            exist_pred: Existence probabilities of shape (B, 4)
+            exist_pred: Existence logits of shape (B, 4)
         """
         x = self.backbone(x)
         x = self.scnn_neck(x)
@@ -85,16 +84,23 @@ class SCNN(nn.Module):
 
         return seg_pred, exist_pred
 
-    def _initialize_weights(self) -> None:
+    def _initialize_weights(self, pretrained: bool) -> None:
         """
-        Initialize model weights using best practices.
+        Initialize model weights.
+
+        Args:
+            pretrained: If True, skip backbone initialization (uses ImageNet weights)
 
         Applies:
         - Kaiming normal initialization for Conv2d layers (optimal for ReLU)
         - Constant initialization for BatchNorm2d (weight=1, bias=0)
         - Normal initialization for Linear layers (mean=0, std=0.01)
         """
-        for m in self.modules():
+        for name, m in self.named_modules():
+            # Skip backbone if pretrained
+            if pretrained and name.startswith('backbone'):
+                continue
+
             if isinstance(m, nn.Conv2d):
                 nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
                 if m.bias is not None:

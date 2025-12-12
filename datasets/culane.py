@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import Literal
 
 import cv2
 import numpy as np
@@ -7,9 +6,6 @@ import torch
 from torch.utils.data import Dataset
 
 import albumentations as A
-
-
-ImageSet = Literal['train', 'val', 'test']
 
 
 class CULane(Dataset):
@@ -25,11 +21,14 @@ class CULane(Dataset):
     def __init__(
         self,
         root: str | Path,
-        image_set: ImageSet,
+        image_set: str,
         transforms: A.Compose = None,
     ) -> None:
         super().__init__()
-        assert image_set in ('train', 'val', 'test'), "image_set must be 'train', 'val', or 'test'"
+
+        assert image_set in ('train', 'val', 'test'), (
+            f"image_set must be one of ('train', 'val', 'test'), got '{image_set}'"
+        )
 
         self.root = Path(root)
         self.image_set = image_set
@@ -66,11 +65,11 @@ class CULane(Dataset):
                 self.img_list.append(self.root / line.strip().lstrip('/'))
 
     def __getitem__(self, idx: int) -> dict:
-        img = cv2.imread(str(self.img_list[idx]))
+        img = cv2.imread(self.img_list[idx], cv2.IMREAD_COLOR)
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
         if self.image_set != 'test':
-            seg_label = cv2.imread(str(self.seg_label_list[idx]))[:, :, 0]
+            seg_label = cv2.imread(self.seg_label_list[idx], cv2.IMREAD_GRAYSCALE)
             exist = np.array(self.exist_list[idx], dtype=np.float32)
         else:
             seg_label = None

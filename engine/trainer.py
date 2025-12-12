@@ -3,13 +3,7 @@ from pathlib import Path
 import torch
 import torch.nn as nn
 
-from utils import Logger
-
-
-def infinite_loader(loader):
-    """Get an infinite stream of batches from a data loader."""
-    while True:
-        yield from loader
+from utils import Logger, infinite_loader, Metrics
 
 
 class Trainer:
@@ -57,75 +51,13 @@ class Trainer:
         self.save_interval = config['checkpoint']['save_interval']
         self.save_dir.mkdir(parents=True, exist_ok=True)
 
-        # Logger
+        # Logger and metrics
         self.logger = Logger(self.save_dir)
+        self.metrics = Metrics()
 
         # Training state
         self.start_iter = 0
         self.best_val_loss = float('inf')
-
-        # Running metrics for training (accumulated between validations)
-        self._reset_running_metrics()
-
-    def _reset_running_metrics(self) -> None:
-        """Reset running metrics for training."""
-        self.running_loss = 0.0
-        self.running_loss_seg = 0.0
-        self.running_loss_exist = 0.0
-        self.running_seg_correct = 0
-        self.running_seg_pixels = 0
-        self.running_exist_correct = 0
-        self.running_exist_samples = 0
-        self.running_count = 0
-
-    def _update_running_metrics(
-        self,
-        loss: float,
-        loss_seg: float,
-        loss_exist: float,
-        seg_pred: torch.Tensor,
-        exist_pred: torch.Tensor,
-        seg_gt: torch.Tensor,
-        exist_gt: torch.Tensor,
-    ) -> None:
-        """Update running metrics with current batch."""
-        self.running_loss += loss
-        self.running_loss_seg += loss_seg
-        self.running_loss_exist += loss_exist
-        self.running_count += 1
-
-        with torch.no_grad():
-            # Segmentation accuracy
-            seg_pred_class = seg_pred.argmax(dim=1)
-            self.running_seg_correct += (seg_pred_class == seg_gt).sum().item()
-            self.running_seg_pixels += seg_gt.numel()
-
-            # Existence accuracy
-            exist_pred_binary = (torch.sigmoid(exist_pred) > 0.5).float()
-            self.running_exist_correct += (exist_pred_binary == exist_gt).sum().item()
-            self.running_exist_samples += exist_gt.numel()
-
-    def _get_running_metrics(self) -> dict:
-        """Get averaged running metrics."""
-        return {
-            'loss': self.running_loss / self.running_count,
-            'loss_seg': self.running_loss_seg / self.running_count,
-            'loss_exist': self.running_loss_exist / self.running_count,
-            'seg_acc': self.running_seg_correct / self.running_seg_pixels,
-            'exist_acc': self.running_exist_correct / self.running_exist_samples,
-        }
-
-    def _print_training_metrics(self, cur_iter: int, loss: float, loss_seg: float, loss_exist: float) -> None:
-        """Print current training metrics."""
-        lr = self.optimizer.param_groups[0]['lr']
-        metrics = self._get_running_metrics()
-
-        print(
-            f"Iter [{cur_iter + 1}/{self.max_iter}] "
-            f"LR: {lr:.6f} | "
-            f"Loss: {loss:.4f} (seg: {loss_seg:.4f}, exist: {loss_exist:.4f}) | "
-            f"Seg Acc: {metrics['seg_acc']:.4f}, Exist Acc: {metrics['exist_acc']:.4f}"
-        )
 
     def train(self) -> None:
         """Main training loop over all iterations."""
@@ -147,36 +79,38 @@ class Trainer:
             # Compute loss
             loss, loss_seg, loss_exist = self.criterion(seg_pred, exist_pred, seg_gt, exist_gt)
 
-            # Handle DataParallel
-            if isinstance(self.model, nn.DataParallel):
-                loss = loss.mean()
-                loss_seg = loss_seg.mean()
-                loss_exist = loss_exist.mean()
-
             # Backward pass
             loss.backward()
             self.optimizer.step()
 
-            # Update running metrics
-            self._update_running_metrics(
+            # Update metrics
+            self.metrics.update(
                 loss.item(), loss_seg.item(), loss_exist.item(),
                 seg_pred, exist_pred, seg_gt, exist_gt
             )
 
             # Print training metrics
             if (cur_iter + 1) % self.print_interval == 0:
-                self._print_training_metrics(cur_iter, loss.item(), loss_seg.item(), loss_exist.item())
+                lr = self.optimizer.param_groups[0]['lr']
+                m = self.metrics.get_metrics()
+                print(
+                    f"Iter [{cur_iter + 1}/{self.max_iter}] "
+                    f"LR: {lr:.6f} | "
+                    f"Loss: {loss.item():.4f} (seg: {loss_seg.item():.4f}, exist: {loss_exist.item():.4f}) | "
+                    f"Seg Acc: {m['seg_acc']:.4f}, Exist Acc: {m['exist_acc']:.4f}"
+                )
 
             # Validation and checkpoint at intervals
             if (cur_iter + 1) % self.val_interval == 0:
                 # Get training metrics
-                train_metrics = self._get_running_metrics()
-                self._reset_running_metrics()
+                train_metrics = self.metrics.get_metrics()
+                self.metrics.reset()
 
                 # Validate
                 val_metrics = self.validate()
 
                 # Step scheduler with validation loss
+                # Note: patience=5 means 5 validations (10,000 iterations) without improvement
                 self.lr_scheduler.step(val_metrics['loss'])
 
                 # Log metrics
@@ -234,12 +168,6 @@ class Trainer:
                 # Compute loss
                 loss, loss_seg, loss_exist = self.criterion(seg_pred, exist_pred, seg_gt, exist_gt)
 
-                # Handle DataParallel
-                if isinstance(self.model, nn.DataParallel):
-                    loss = loss.mean()
-                    loss_seg = loss_seg.mean()
-                    loss_exist = loss_exist.mean()
-
                 # Accumulate losses
                 total_loss += loss.item()
                 total_loss_seg += loss_seg.item()
@@ -274,7 +202,7 @@ class Trainer:
         """
         state = {
             'iteration': iteration,
-            'net': self.model.module.state_dict() if isinstance(self.model, nn.DataParallel) else self.model.state_dict(),
+            'net': self.model.state_dict(),
             'optimizer': self.optimizer.state_dict(),
             'lr_scheduler': self.lr_scheduler.state_dict(),
             'best_val_loss': self.best_val_loss,
@@ -301,10 +229,7 @@ class Trainer:
         checkpoint = torch.load(checkpoint_path, map_location=self.device)
 
         # Load model state
-        if isinstance(self.model, nn.DataParallel):
-            self.model.module.load_state_dict(checkpoint['net'])
-        else:
-            self.model.load_state_dict(checkpoint['net'])
+        self.model.load_state_dict(checkpoint['net'])
 
         # Load optimizer and scheduler state
         self.optimizer.load_state_dict(checkpoint['optimizer'])

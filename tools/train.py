@@ -73,11 +73,6 @@ def build_model(config: dict, device: torch.device):
     model = SCNN(input_size=input_size, ms_ks=ms_ks, pretrained=pretrained)
     model = model.to(device)
 
-    # Use DataParallel if multiple GPUs available
-    if torch.cuda.device_count() > 1:
-        print(f"Using {torch.cuda.device_count()} GPUs")
-        model = torch.nn.DataParallel(model)
-
     return model
 
 

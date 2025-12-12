@@ -105,6 +105,6 @@ class CULane(Dataset):
             return {'img': img, 'seg_label': None, 'exist': None, 'img_name': img_name}
 
         seg_label = torch.stack([b['seg_label'] for b in batch])
-        exist = torch.tensor([b['exist'] for b in batch])
+        exist = torch.from_numpy(np.stack([b['exist'] for b in batch]))
 
         return {'img': img, 'seg_label': seg_label, 'exist': exist, 'img_name': img_name}

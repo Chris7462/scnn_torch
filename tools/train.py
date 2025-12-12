@@ -29,8 +29,16 @@ def build_transforms(config: dict, is_train: bool = True):
     std = tuple(config['normalize']['std'])
 
     if is_train:
-        rotation = config['train']['rotation']
-        return get_train_transforms(resize_shape, rotation, mean, std)
+        aug_cfg = config['augmentation']
+        return get_train_transforms(
+            resize_shape,
+            mean,
+            std,
+            rotation=aug_cfg['rotation'],
+            horizontal_flip_prob=aug_cfg['horizontal_flip_prob'],
+            color_jitter_prob=aug_cfg['color_jitter_prob'],
+            motion_blur_prob=aug_cfg['motion_blur_prob'],
+        )
     else:
         return get_val_transforms(resize_shape, mean, std)
 

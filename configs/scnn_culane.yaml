@@ -19,7 +19,13 @@ dataloader:
 # Training
 train:
   max_iter: 90000
-  rotation: 2  # Rotation augmentation angle
+
+# Augmentation
+augmentation:
+  rotation: 2.0
+  horizontal_flip_prob: 0.5
+  color_jitter_prob: 0.5
+  motion_blur_prob: 0.2
 
 # Optimizer
 optimizer:

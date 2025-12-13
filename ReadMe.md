@@ -18,14 +18,14 @@ ln -s /path/to/CULane data/CULane
 Expected structure:
 ```
 data/CULane/
-├── driver_100_30frame/       # Test example, no ground truth
-├── driver_161_90frame/       # Training example
-├── driver_182_30frame/       # Training example
-├── driver_193_90frame/       # Test example, no ground truth
-├── driver_23_30frame/        # Training & Validation example
-├── driver_37_30frame/        # Test example, no ground truth
-├── laneseg_label_w16/        # Ground truth for training & validation
-├── laneseg_label_w16_test/   # No ground truth for test set
+├── driver_100_30frame/
+├── driver_161_90frame/
+├── driver_182_30frame/
+├── driver_193_90frame/
+├── driver_23_30frame/
+├── driver_37_30frame/
+├── laneseg_label_w16/
+├── laneseg_label_w16_test/
 └── list/
     ├── train_gt.txt
     ├── val_gt.txt
@@ -106,14 +106,6 @@ Evaluation outputs:
 - Per-category results saved to `outputs/evaluate/out_<category>.txt`
 - Summary saved to `outputs/evaluate/summary_iou<threshold>.txt`
 
-### Note on Evaluation Results
-
-The Python evaluator may produce slightly different results (~0.1-0.5% F1) compared to the official C++ CULane evaluator. This is due to differences in spline interpolation algorithms:
-- C++ uses a custom cubic spline with TDMA solver
-- Python uses `scipy.splprep` (B-spline)
-
-The difference is minor and acceptable for most purposes.
-
 ### Evaluation Metrics
 
 The evaluator computes precision, recall, and F1-measure for each category:
@@ -130,6 +122,14 @@ The evaluator computes precision, recall, and F1-measure for each category:
 | Cross | Crossroads (FP only, no GT lanes) |
 | Night | Nighttime driving |
 
+### Note on Evaluation Results
+
+The Python evaluator may produce slightly different results (~0.1-0.5% F1) compared to the official C++ CULane evaluator. This is due to differences in spline interpolation algorithms:
+- C++ uses a custom cubic spline with TDMA solver
+- Python uses `scipy.splprep` (B-spline)
+
+The difference is minor and acceptable for most purposes.
+
 ## Project Structure
 ```
 ├── configs/              # Configuration files
@@ -143,13 +143,12 @@ The evaluator computes precision, recall, and F1-measure for each category:
 ├── engine/               # Training and evaluation
 ├── utils/                # Utilities
 │   ├── config.py         # Config loading
+│   ├── culane_eval.py    # CULane evaluation
 │   ├── data.py           # Data utilities
 │   ├── logger.py         # Training logger
 │   ├── metrics.py        # Metrics tracking
 │   ├── postprocessing.py # Lane coordinate extraction
-│   ├── visualization.py  # Lane visualization
-│   └── lane_evaluation/  # CULane evaluation
-│       └── culane_eval.py
+│   └── visualization.py  # Lane visualization
 └── tools/                # Scripts
     ├── train.py          # Training script
     ├── test.py           # Testing script

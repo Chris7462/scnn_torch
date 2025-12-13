@@ -16,7 +16,7 @@ def parse_args():
                         help='Path to config file')
     parser.add_argument('--checkpoint', type=str, required=True,
                         help='Path to model checkpoint')
-    parser.add_argument('--output_dir', type=str, default='output',
+    parser.add_argument('--output_dir', type=str, default='outputs',
                         help='Directory to save predictions')
     parser.add_argument('--visualize', action='store_true',
                         help='Save visualization images')
@@ -54,21 +54,19 @@ def build_dataloader(config: dict, transforms):
     return dataloader
 
 
-def build_model(config: dict, device: torch.device):
+def build_model(config: dict):
     """Build SCNN model."""
     input_size = tuple(config['model']['input_size'])
     ms_ks = config['model']['ms_ks']
-
     model = SCNN(input_size=input_size, ms_ks=ms_ks, pretrained=False)
-    model = model.to(device)
 
     return model
 
 
-def load_checkpoint(model, checkpoint_path: str, device: torch.device):
+def load_checkpoint(model, checkpoint_path: str):
     """Load model weights from checkpoint."""
     print(f"Loading checkpoint: {checkpoint_path}")
-    checkpoint = torch.load(checkpoint_path, map_location=device)
+    checkpoint = torch.load(checkpoint_path, map_location='cpu')
 
     model.load_state_dict(checkpoint['net'])
 
@@ -87,7 +85,7 @@ def main():
     config['output_dir'] = args.output_dir
 
     # Device
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = torch.accelerator.current_accelerator().type if torch.accelerator.is_available() else "cpu"
     print(f"Using device: {device}")
 
     # Build transforms
@@ -100,10 +98,10 @@ def main():
 
     # Build model
     print("Building model...")
-    model = build_model(config, device)
+    model = build_model(config).to(device)
 
     # Load checkpoint
-    model = load_checkpoint(model, args.checkpoint, device)
+    model = load_checkpoint(model, args.checkpoint)
 
     # Build evaluator
     evaluator = Evaluator(

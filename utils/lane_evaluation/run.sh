@@ -2,7 +2,7 @@
 
 # Auto-detect paths
 bin_dir=$(cd "$(dirname "$0")" && pwd)
-root=$(cd "${bin_dir}/../../.." && pwd)
+root=$(cd "${bin_dir}/../.." && pwd)
 data_dir=${root}/data/CULane/
 detect_dir=${root}/outputs/predictions/
 eval_dir=${root}/outputs/evaluate/

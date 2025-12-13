@@ -27,3 +27,4 @@ outputs
 checkpoints
 __pycache__
 .vscode
+build

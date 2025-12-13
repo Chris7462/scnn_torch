@@ -62,11 +62,6 @@ def build_model(config: dict, device: torch.device):
     model = SCNN(input_size=input_size, ms_ks=ms_ks, pretrained=False)
     model = model.to(device)
 
-    # Use DataParallel if multiple GPUs available
-    if torch.cuda.device_count() > 1:
-        print(f"Using {torch.cuda.device_count()} GPUs")
-        model = torch.nn.DataParallel(model)
-
     return model
 
 
@@ -75,11 +70,7 @@ def load_checkpoint(model, checkpoint_path: str, device: torch.device):
     print(f"Loading checkpoint: {checkpoint_path}")
     checkpoint = torch.load(checkpoint_path, map_location=device)
 
-    # Handle DataParallel
-    if isinstance(model, torch.nn.DataParallel):
-        model.module.load_state_dict(checkpoint['net'])
-    else:
-        model.load_state_dict(checkpoint['net'])
+    model.load_state_dict(checkpoint['net'])
 
     print(f"  Loaded from iteration {checkpoint['iteration']}")
     return model

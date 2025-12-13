@@ -64,19 +64,13 @@ def build_dataloader(config: dict, image_set: str, transforms):
     return dataloader
 
 
-def build_model(config: dict, device: torch.device):
+def build_model(config: dict):
     """Build SCNN model."""
     input_size = tuple(config['model']['input_size'])
     ms_ks = config['model']['ms_ks']
     pretrained = config['model']['pretrained']
 
     model = SCNN(input_size=input_size, ms_ks=ms_ks, pretrained=pretrained)
-    model = model.to(device)
-
-    # Use DataParallel if multiple GPUs available
-    if torch.cuda.device_count() > 1:
-        print(f"Using {torch.cuda.device_count()} GPUs")
-        model = torch.nn.DataParallel(model)
 
     return model
 
@@ -90,7 +84,6 @@ def build_optimizer(config: dict, model):
         lr=optimizer_cfg['lr'],
         momentum=optimizer_cfg['momentum'],
         weight_decay=optimizer_cfg['weight_decay'],
-        nesterov=optimizer_cfg['nesterov'],
     )
 
     return optimizer
@@ -111,7 +104,7 @@ def build_lr_scheduler(config: dict, optimizer):
     return scheduler
 
 
-def build_criterion(config: dict, device: torch.device):
+def build_criterion(config: dict):
     """Build loss function."""
     loss_cfg = config['loss']
 
@@ -120,7 +113,6 @@ def build_criterion(config: dict, device: torch.device):
         exist_weight=loss_cfg['exist_weight'],
         background_weight=loss_cfg['background_weight'],
     )
-    criterion = criterion.to(device)
 
     return criterion
 
@@ -133,7 +125,7 @@ def main():
     print(f"Loaded config from {args.config}")
 
     # Device
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = torch.accelerator.current_accelerator().type if torch.accelerator.is_available() else "cpu"
     print(f"Using device: {device}")
 
     # Build transforms
@@ -149,7 +141,7 @@ def main():
 
     # Build model
     print("Building model...")
-    model = build_model(config, device)
+    model = build_model(config).to(device)
 
     # Build optimizer
     optimizer = build_optimizer(config, model)
@@ -158,7 +150,7 @@ def main():
     lr_scheduler = build_lr_scheduler(config, optimizer)
 
     # Build criterion
-    criterion = build_criterion(config, device)
+    criterion = build_criterion(config).to(device)
 
     # Build trainer
     trainer = Trainer(
@@ -179,8 +171,7 @@ def main():
     # Train
     print("\nStarting training...")
     print(f"  Max iterations: {config['train']['max_iter']}")
-    print(f"  Validation interval: {config['validation']['interval']}")
-    print(f"  Checkpoint interval: {config['checkpoint']['save_interval']}")
+    print(f"  Checkpoint interval: {config['checkpoint']['interval']}")
     trainer.train()
 
 

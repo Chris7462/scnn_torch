@@ -52,10 +52,10 @@ The training is iteration-based. Key settings in `configs/scnn_culane.yaml`:
 
 | Parameter | Value | Description |
 |-----------|-------|-------------|
+| `model.input_size` | [288, 800] | Input size [height, width] |
 | `train.max_iter` | 90000 | Total training iterations |
-| `validation.interval` | 2000 | Validate every N iterations |
-| `checkpoint.save_interval` | 2000 | Save checkpoint every N iterations |
-| `logging.print_interval` | 50 | Print training metrics every N iterations |
+| `checkpoint.interval` | 2000 | Validate and save checkpoint every N iterations |
+| `logging.print_interval` | 100 | Print training metrics every N iterations |
 | `optimizer.lr` | 0.01 | Base learning rate |
 | `lr_scheduler.patience` | 5 | Reduce LR after N validations without improvement |
 | `lr_scheduler.factor` | 0.5 | LR reduction factor |
@@ -66,7 +66,7 @@ The training is iteration-based. Key settings in `configs/scnn_culane.yaml`:
 python tools/test.py --config configs/scnn_culane.yaml --checkpoint checkpoints/best.pth
 ```
 
-With visualization (saves first 20 images with lane overlay):
+With visualization (saves first 50 images with lane overlay):
 ```bash
 python tools/test.py --config configs/scnn_culane.yaml --checkpoint checkpoints/best.pth --visualize
 ```
@@ -91,7 +91,13 @@ Test outputs:
 │   ├── head/         # Segmentation and existence heads
 │   └── loss/         # Loss functions
 ├── engine/           # Training and evaluation
-├── utils/            # Utilities (logging, visualization, config)
+├── utils/            # Utilities
+│   ├── config.py     # Config loading
+│   ├── data.py       # Data utilities
+│   ├── logger.py     # Training logger
+│   ├── metrics.py    # Metrics tracking
+│   ├── postprocessing.py  # Lane coordinate extraction
+│   └── visualization.py   # Lane visualization
 └── tools/            # Train and test scripts
 ```
 

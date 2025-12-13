@@ -2,12 +2,12 @@ import cv2
 import numpy as np
 
 
-# Lane colors: 4 lanes with distinct colors (BGR format for cv2)
+# Lane colors: 4 lanes with distinct colors (RGB format)
 LANE_COLORS = np.array([
     [255, 125, 0],    # Lane 1: Orange
     [0, 255, 0],      # Lane 2: Green
-    [0, 0, 255],      # Lane 3: Red
-    [0, 255, 255],    # Lane 4: Yellow
+    [255, 0, 0],      # Lane 3: Red
+    [255, 255, 0],    # Lane 4: Yellow
 ], dtype='uint8')
 
 
@@ -65,47 +65,3 @@ def add_exist_text(img: np.ndarray, exist_pred: np.ndarray) -> np.ndarray:
     exist_probs = [f"{p:.2f}" for p in exist_pred]
     cv2.putText(img, f"{exist_probs}", (20, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
     return img
-
-
-def prepare_visualization_batch(
-    imgs: list[str],
-    seg_preds: np.ndarray,
-    exist_preds: np.ndarray,
-    resize_shape: tuple[int, int],
-    threshold: float = 0.5,
-) -> list[np.ndarray]:
-    """
-    Prepare a batch of visualizations for TensorBoard.
-
-    Args:
-        imgs: List of image paths
-        seg_preds: Segmentation predictions (B, 5, H, W)
-        exist_preds: Existence predictions (B, 4)
-        resize_shape: Target size as (width, height)
-        threshold: Threshold for existence prediction
-
-    Returns:
-        List of visualization images for TensorBoard
-    """
-    result_imgs = []
-
-    for i in range(len(seg_preds)):
-        img = cv2.imread(imgs[i])
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        img = cv2.resize(img, resize_shape, interpolation=cv2.INTER_CUBIC)
-
-        seg_pred = seg_preds[i]
-        exist_pred = exist_preds[i]
-
-        # Generate visualizations
-        img_overlay, lane_img = visualize_lanes(img, seg_pred, exist_pred, threshold)
-        lane_img = add_exist_text(lane_img, exist_pred)
-
-        # Convert to RGB for TensorBoard
-        img_overlay = cv2.cvtColor(img_overlay, cv2.COLOR_BGR2RGB) if img_overlay.shape[2] == 3 else img_overlay
-        lane_img = cv2.cvtColor(lane_img, cv2.COLOR_BGR2RGB) if lane_img.shape[2] == 3 else lane_img
-
-        result_imgs.append(img_overlay)
-        result_imgs.append(lane_img)
-
-    return result_imgs

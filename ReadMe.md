@@ -29,7 +29,17 @@ data/CULane/
 └── list/
     ├── train_gt.txt
     ├── val_gt.txt
-    └── test.txt
+    ├── test.txt
+    └── test_split/
+        ├── test0_normal.txt
+        ├── test1_crowd.txt
+        ├── test2_hlight.txt
+        ├── test3_shadow.txt
+        ├── test4_noline.txt
+        ├── test5_arrow.txt
+        ├── test6_curve.txt
+        ├── test7_cross.txt
+        └── test8_night.txt
 ```
 
 ## Training
@@ -66,7 +76,7 @@ The training is iteration-based. Key settings in `configs/scnn_culane.yaml`:
 python tools/test.py --config configs/scnn_culane.yaml --checkpoint checkpoints/best.pth
 ```
 
-With visualization (saves first 50 images with lane overlay):
+With visualization (saves first 20 images with lane overlay):
 ```bash
 python tools/test.py --config configs/scnn_culane.yaml --checkpoint checkpoints/best.pth --visualize
 ```
@@ -77,28 +87,65 @@ python tools/test.py --config configs/scnn_culane.yaml --checkpoint checkpoints/
 ```
 
 Test outputs:
-- Predictions saved to `output/predictions/`
-- Visualizations saved to `output/visualizations/` (if `--visualize` enabled)
+- Predictions saved to `outputs/predictions/`
+- Visualizations saved to `outputs/visualizations/` (if `--visualize` enabled)
+
+## Evaluation
+
+Evaluate predictions against ground truth:
+```bash
+python tools/evaluate.py --pred_dir outputs/predictions --data_dir data/CULane
+```
+
+With different IoU threshold:
+```bash
+python tools/evaluate.py --pred_dir outputs/predictions --data_dir data/CULane --iou 0.3
+```
+
+Evaluation outputs:
+- Per-category results saved to `outputs/evaluate/out_<category>.txt`
+- Summary saved to `outputs/evaluate/summary_iou<threshold>.txt`
+
+### Evaluation Metrics
+
+The evaluator computes precision, recall, and F1-measure for each category:
+
+| Category | Description |
+|----------|-------------|
+| Normal | Normal driving conditions |
+| Crowd | Crowded traffic |
+| HLight | High light / glare |
+| Shadow | Shadows on road |
+| No line | Faded or missing lane markings |
+| Arrow | Arrow markings on road |
+| Curve | Curved lanes |
+| Cross | Crossroads (FP only, no GT lanes) |
+| Night | Nighttime driving |
 
 ## Project Structure
 ```
-├── configs/          # Configuration files
-├── datasets/         # Dataset and transforms
-├── model/            # Model architecture
-│   ├── backbone/     # VGG16 backbone
-│   ├── neck/         # Channel reduction
-│   ├── spatial/      # Message passing module
-│   ├── head/         # Segmentation and existence heads
-│   └── loss/         # Loss functions
-├── engine/           # Training and evaluation
-├── utils/            # Utilities
-│   ├── config.py     # Config loading
-│   ├── data.py       # Data utilities
-│   ├── logger.py     # Training logger
-│   ├── metrics.py    # Metrics tracking
-│   ├── postprocessing.py  # Lane coordinate extraction
-│   └── visualization.py   # Lane visualization
-└── tools/            # Train and test scripts
+├── configs/              # Configuration files
+├── datasets/             # Dataset and transforms
+├── model/                # Model architecture
+│   ├── backbone/         # VGG16 backbone
+│   ├── neck/             # Channel reduction
+│   ├── spatial/          # Message passing module
+│   ├── head/             # Segmentation and existence heads
+│   └── loss/             # Loss functions
+├── engine/               # Training and evaluation
+├── utils/                # Utilities
+│   ├── config.py         # Config loading
+│   ├── data.py           # Data utilities
+│   ├── logger.py         # Training logger
+│   ├── metrics.py        # Metrics tracking
+│   ├── postprocessing.py # Lane coordinate extraction
+│   ├── visualization.py  # Lane visualization
+│   └── lane_evaluation/  # CULane evaluation
+│       └── culane_eval.py
+└── tools/                # Scripts
+    ├── train.py          # Training script
+    ├── test.py           # Testing script
+    └── evaluate.py       # Evaluation script
 ```
 
 ## Reference

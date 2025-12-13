@@ -40,19 +40,19 @@ class SCNN(nn.Module):
 
     def __init__(
         self,
-        input_size: tuple[int, int] = (800, 288),
+        input_size: tuple[int, int] = (288, 800),
         ms_ks: int = 9,
         pretrained: bool = True,
     ) -> None:
         """
         Args:
-            input_size: (width, height) of input image
+            input_size: (height, width) of input image
             ms_ks: Kernel size for message passing convolutions
             pretrained: Whether to use pretrained VGG16 backbone
         """
         super().__init__()
 
-        input_width, input_height = input_size
+        input_height, input_width = input_size
         feature_height = input_height // 8
         feature_width = input_width // 8
 

@@ -3,7 +3,7 @@ from pathlib import Path
 import torch
 import torch.nn as nn
 
-from utils import Logger, infinite_loader, Metrics
+from utils import Logger, Metrics, infinite_loader
 
 
 class Trainer:
@@ -94,8 +94,7 @@ class Trainer:
                 lr = self.optimizer.param_groups[0]['lr']
                 m = self.metrics.get_metrics()
                 print(
-                    f"Iter [{cur_iter + 1}/{self.max_iter}] "
-                    f"LR: {lr:.6f} | "
+                    f"Iter [{cur_iter + 1}/{self.max_iter}] LR: {lr:.6f} | "
                     f"Loss: {loss.item():.4f} (seg: {loss_seg.item():.4f}, exist: {loss_exist.item():.4f}) | "
                     f"Seg Acc: {m['seg_acc']:.4f}, Exist Acc: {m['exist_acc']:.4f}"
                 )
@@ -123,9 +122,8 @@ class Trainer:
                 # Plot training history
                 self.logger.plot()
 
-                # Save checkpoint
-                if (cur_iter + 1) % self.save_interval == 0:
-                    self.save_checkpoint(cur_iter + 1)
+                # Save checkpoint after each validation
+                self.save_checkpoint(cur_iter + 1)
 
                 # Save best model
                 val_loss = val_metrics['loss']

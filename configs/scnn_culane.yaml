@@ -53,14 +53,13 @@ normalize:
   mean: [0.485, 0.456, 0.406]
   std: [0.229, 0.224, 0.225]
 
-# Validation
+# Validation (checkpoints saved at each validation)
 validation:
   interval: 2000
 
 # Checkpoints
 checkpoint:
   save_dir: checkpoints
-  save_interval: 2000
 
 # Logging
 logging:

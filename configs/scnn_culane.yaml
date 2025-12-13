@@ -2,14 +2,14 @@
 
 # Model
 model:
-  input_size: [800, 288]  # [width, height]
+  input_size: [288, 800]  # [height, width]
   ms_ks: 9                # Message passing kernel size
   pretrained: true
 
 # Dataset
 dataset:
   root: data/CULane
-  resize_shape: [800, 288]  # [width, height]
+  resize_shape: [288, 800]  # [height, width]
 
 # Dataloader
 dataloader:
@@ -63,7 +63,10 @@ logging:
 
 # Evaluation
 evaluation:
+  resize_shape: [590, 1640]  # [height, width]
+  y_px_gap: 20
+  pts: 18
+  thresh: 0.3
+  # For official CULane evaluation tool (not used in Python evaluator)
   iou_threshold: 0.5
   lane_width: 30
-  im_width: 1640
-  im_height: 590

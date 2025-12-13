@@ -69,7 +69,6 @@ def build_model(config: dict):
     input_size = tuple(config['model']['input_size'])
     ms_ks = config['model']['ms_ks']
     pretrained = config['model']['pretrained']
-
     model = SCNN(input_size=input_size, ms_ks=ms_ks, pretrained=pretrained)
 
     return model

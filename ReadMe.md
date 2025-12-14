@@ -42,6 +42,23 @@ data/CULane/
         └── test8_night.txt
 ```
 
+## Computing Dataset Statistics
+
+Before training, you can compute the mean and standard deviation for the CULane dataset to use for normalization:
+
+```bash
+python tools/compute_mean_std.py --data_dir data/CULane
+```
+
+With custom settings:
+```bash
+python tools/compute_mean_std.py --data_dir data/CULane --batch_size 128 --num_workers 4 --resize_height 288 --resize_width 800
+```
+
+This will compute statistics for both original and resized images. Copy the output values to your config file (`configs/scnn_culane.yaml`) under the `normalize` section.
+
+**Note**: The default config already includes pre-computed normalization values, so this step is optional unless you want to verify or use different resize dimensions.
+
 ## Training
 ```bash
 python tools/train.py --config configs/scnn_culane.yaml
@@ -152,7 +169,8 @@ The difference is minor and acceptable for most purposes.
 └── tools/                # Scripts
     ├── train.py          # Training script
     ├── test.py           # Testing script
-    └── evaluate.py       # Evaluation script
+    ├── evaluate.py       # Evaluation script
+    └── compute_mean_std.py # Dataset statistics computation
 ```
 
 ## Reference

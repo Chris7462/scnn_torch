@@ -49,8 +49,9 @@ loss:
 
 # Normalization (ImageNet)
 normalize:
-  mean: [0.485, 0.456, 0.406]
-  std: [0.229, 0.224, 0.225]
+  mean: [0.3598, 0.3723, 0.3771]
+  std: [0.2772, 0.2915, 0.3087]
+
 
 # Checkpoints (validation happens before each checkpoint save)
 checkpoint:

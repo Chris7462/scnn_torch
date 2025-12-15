@@ -52,7 +52,6 @@ normalize:
   mean: [0.3598, 0.3723, 0.3771]
   std: [0.2772, 0.2915, 0.3087]
 
-
 # Checkpoints (validation happens before each checkpoint save)
 checkpoint:
   save_dir: checkpoints
@@ -64,10 +63,12 @@ logging:
 
 # Evaluation
 evaluation:
-  resize_shape: [590, 1640]  # [height, width]
-  y_px_gap: 20
-  pts: 18
-  thresh: 0.3
-  # For official CULane evaluation tool (not used in Python evaluator)
-  iou_threshold: 0.5
-  lane_width: 30
+  # Post-processing parameters (convert probability maps to lane coordinates)
+  resize_shape: [590, 1640]  # [height, width] - original CULane image size
+  y_px_gap: 20               # Y-axis sampling interval in pixels
+  pts: 18                    # Number of points to sample per lane
+  thresh: 0.3                # Probability threshold for lane detection
+
+  # Evaluation parameters (for tools/evaluate.py)
+  iou_threshold: 0.5         # IoU threshold for lane matching
+  lane_width: 30             # Lane width in pixels for drawing/evaluation

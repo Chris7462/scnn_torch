@@ -45,7 +45,6 @@ data/CULane/
 ## Computing Dataset Statistics
 
 Before training, you can compute the mean and standard deviation for the CULane dataset to use for normalization:
-
 ```bash
 python tools/compute_mean_std.py --data_dir data/CULane
 ```
@@ -111,12 +110,12 @@ Test outputs:
 
 Evaluate predictions against ground truth:
 ```bash
-python tools/evaluate.py --pred_dir outputs/predictions --data_dir data/CULane
+python tools/evaluate.py --config configs/scnn_culane.yaml --pred_dir outputs/predictions
 ```
 
 With different IoU threshold:
 ```bash
-python tools/evaluate.py --pred_dir outputs/predictions --data_dir data/CULane --iou 0.3
+python tools/evaluate.py --config configs/scnn_culane.yaml --pred_dir outputs/predictions --iou 0.3
 ```
 
 Evaluation outputs:

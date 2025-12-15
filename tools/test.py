@@ -124,9 +124,7 @@ def main():
     if args.visualize:
         print(f"Visualizations saved to: {output_dir}/visualizations")
     print(f"\nTo run official CULane evaluation:")
-    print(f"  cd utils/lane_evaluation/CULane")
-    print(f"  ./evaluate -a <anno_dir> -d {output_dir}/predictions -i <img_dir> -l <list_file>")
-
+    print(f"python tools/evaluate.py --config configs/scnn_culane.yaml --pred_dir outputs/predictions")
 
 if __name__ == '__main__':
     main()

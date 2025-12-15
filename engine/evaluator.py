@@ -165,7 +165,7 @@ class Evaluator:
         img_overlay, _ = visualize_lanes(img_resized, seg_pred, exist_pred)
 
         # Create side-by-side image
-        side_by_side = np.concatenate([img_resized, img_overlay], axis=1)
+        side_by_side = np.concatenate([img_resized, img_overlay], axis=0)
 
         # Convert to BGR for saving
         side_by_side = cv2.cvtColor(side_by_side, cv2.COLOR_RGB2BGR)

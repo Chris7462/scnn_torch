@@ -90,19 +90,8 @@ class SCNN(nn.Module):
         Initialize model weights.
 
         Applies:
-        - Kaiming normal initialization for Conv2d layers (optimal for ReLU)
-        - Constant initialization for BatchNorm2d (weight=1, bias=0)
-        - Normal initialization for Linear layers (mean=0, std=0.01)
+        - PyTorch's defaults are battle-tested
         """
         for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-                if m.bias is not None:
-                    nn.init.constant_(m.bias, 0)
-            elif isinstance(m, nn.BatchNorm2d):
-                nn.init.constant_(m.weight, 1)
-                nn.init.constant_(m.bias, 0)
-            elif isinstance(m, nn.Linear):
-                nn.init.normal_(m.weight, 0, 0.01)
-                if m.bias is not None:
-                    nn.init.constant_(m.bias, 0)
+            if hasattr(m, "reset_parameters"):
+                m.reset_parameters()

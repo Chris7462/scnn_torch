@@ -20,7 +20,7 @@ class ExistHead(nn.Module):
         in_channels: int = 5,
         input_height: int = 36,
         input_width: int = 100,
-        num_lanes: int = 4,
+        num_lanes: int = 4
     ) -> None:
         super().__init__()
 

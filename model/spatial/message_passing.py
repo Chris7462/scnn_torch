@@ -21,6 +21,9 @@ class MessagePassing(nn.Module):
     def __init__(self, channels: int = 128, kernel_size: int = 9) -> None:
         super().__init__()
 
+        self.channels = channels
+        self.kernel_size = kernel_size
+
         # Vertical propagation: kernel (1, k) captures horizontal context at each row for lane width
         self.conv_down = nn.Conv2d(channels, channels, (1, kernel_size), padding=(0, kernel_size // 2), bias=False)
         self.conv_up = nn.Conv2d(channels, channels, (1, kernel_size), padding=(0, kernel_size // 2), bias=False)

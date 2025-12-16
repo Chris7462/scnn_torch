@@ -10,21 +10,17 @@ class SegNeck(nn.Module):
     This output is shared by both seg_head and exist_head.
 
     Architecture:
-        Dropout → Conv(128→5, 1x1)
+        Conv(128→5, 1x1)
     """
 
     def __init__(
         self,
         in_channels: int = 128,
         out_channels: int = 5,
-        dropout: float = 0.1,
     ) -> None:
         super().__init__()
 
-        self.layers = nn.Sequential(
-            nn.Dropout2d(dropout),
-            nn.Conv2d(in_channels, out_channels, kernel_size=1),
-        )
+        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=1)
 
     def forward(self, x: Tensor) -> Tensor:
         """
@@ -34,4 +30,4 @@ class SegNeck(nn.Module):
         Returns:
             Segmentation features of shape (B, 5, H, W)
         """
-        return self.layers(x)
+        return self.conv(x)

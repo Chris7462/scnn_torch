@@ -2,14 +2,13 @@ import argparse
 
 import torch
 import torch.optim as optim
-from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.data import DataLoader
 
 from datasets import CULane
 from datasets.transforms import get_train_transforms, get_val_transforms
 from model import SCNN
 from model.loss import SCNNLoss
-from engine import Trainer
+from engine import Trainer, PolyLR
 from utils import load_config
 
 
@@ -40,7 +39,7 @@ def build_dataloader(config: dict, image_set: str, transforms):
     dataset = CULane(
         root=config['dataset']['root'],
         image_set=image_set,
-        transforms=transforms,
+        transforms=transforms
     )
 
     dataloader = DataLoader(
@@ -50,7 +49,7 @@ def build_dataloader(config: dict, image_set: str, transforms):
         num_workers=config['dataloader']['num_workers'],
         collate_fn=dataset.collate,
         pin_memory=True,
-        drop_last=(image_set == 'train'),
+        drop_last=(image_set == 'train')
     )
 
     return dataloader
@@ -74,22 +73,21 @@ def build_optimizer(config: dict, model):
         model.parameters(),
         lr=optimizer_cfg['lr'],
         momentum=optimizer_cfg['momentum'],
-        weight_decay=optimizer_cfg['weight_decay'],
+        weight_decay=optimizer_cfg['weight_decay']
     )
 
     return optimizer
 
 
 def build_lr_scheduler(config: dict, optimizer):
-    """Build learning rate scheduler."""
-    scheduler_cfg = config['lr_scheduler']
+    """Build PolyLR scheduler."""
+    max_iter = config['train']['max_iter']
+    power = config['lr_scheduler']['power']
 
-    scheduler = ReduceLROnPlateau(
+    scheduler = PolyLR(
         optimizer,
-        mode=scheduler_cfg['mode'],
-        factor=scheduler_cfg['factor'],
-        patience=scheduler_cfg['patience'],
-        min_lr=scheduler_cfg['min_lr'],
+        max_iter=max_iter,
+        power=power
     )
 
     return scheduler
@@ -102,7 +100,7 @@ def build_criterion(config: dict):
     criterion = SCNNLoss(
         seg_weight=loss_cfg['seg_weight'],
         exist_weight=loss_cfg['exist_weight'],
-        background_weight=loss_cfg['background_weight'],
+        background_weight=loss_cfg['background_weight']
     )
 
     return criterion
@@ -138,7 +136,10 @@ def main():
     optimizer = build_optimizer(config, model)
 
     # Build lr scheduler
+    print("Building PolyLR scheduler...")
     lr_scheduler = build_lr_scheduler(config, optimizer)
+    print(f"  Power: {config['lr_scheduler'].get('power', 0.9)}")
+    print(f"  Initial LR: {optimizer.param_groups[0]['lr']:.6f}")
 
     # Build criterion
     criterion = build_criterion(config).to(device)
@@ -163,6 +164,7 @@ def main():
     print("\nStarting training...")
     print(f"  Max iterations: {config['train']['max_iter']}")
     print(f"  Checkpoint interval: {config['checkpoint']['interval']}")
+    print("=" * 60)
     trainer.train()
 
 

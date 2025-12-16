@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 
 from utils import Logger, Metrics, infinite_loader
+from .poly_lr import PolyLR
 
 
 class Trainer:
@@ -16,7 +17,7 @@ class Trainer:
         val_loader: Validation data loader
         criterion: Loss function (SCNNLoss)
         optimizer: Optimizer
-        lr_scheduler: Learning rate scheduler
+        lr_scheduler: Learning rate scheduler (PolyLR)
         config: Configuration dictionary
         device: Device to train on
     """
@@ -28,7 +29,7 @@ class Trainer:
         val_loader,
         criterion: nn.Module,
         optimizer: torch.optim.Optimizer,
-        lr_scheduler,
+        lr_scheduler: PolyLR,
         config: dict,
         device: torch.device,
     ) -> None:
@@ -81,6 +82,7 @@ class Trainer:
             # Backward pass
             loss.backward()
             self.optimizer.step()
+            self.lr_scheduler.step()
 
             # Update metrics
             self.metrics.update(
@@ -106,10 +108,6 @@ class Trainer:
 
                 # Validate
                 val_metrics = self.validate()
-
-                # Step scheduler with validation loss
-                # Note: patience=5 means 5 validations (10,000 iterations) without improvement
-                self.lr_scheduler.step(val_metrics['loss'])
 
                 # Log metrics
                 self.logger.update(cur_iter + 1, train_metrics, val_metrics)

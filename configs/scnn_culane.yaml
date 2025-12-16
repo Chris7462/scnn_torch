@@ -33,10 +33,7 @@ optimizer:
 
 # Learning rate scheduler
 lr_scheduler:
-  mode: min
-  factor: 0.5
-  patience: 5
-  min_lr: 0.00001
+  power: 0.9  # Polynomial decay power
 
 # Loss
 loss:

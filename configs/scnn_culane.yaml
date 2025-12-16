@@ -4,7 +4,7 @@
 model:
   input_size: [288, 800]  # [height, width]
   ms_ks: 9                # Message passing kernel size
-  pretrained: true
+  pretrained: false
 
 # Dataset
 dataset:
@@ -22,10 +22,7 @@ train:
 
 # Augmentation
 augmentation:
-  rotation: 2.0
-  horizontal_flip_prob: 0.5
-  color_jitter_prob: 0.5
-  motion_blur_prob: 0.2
+  rotation: 2.0  # Random rotation in degrees (samples from [-rotation/2, rotation/2])
 
 # Optimizer
 optimizer:
@@ -47,7 +44,7 @@ loss:
   exist_weight: 0.1
   background_weight: 0.4
 
-# Normalization (ImageNet)
+# Normalization (CULane dataset statistics)
 normalize:
   mean: [0.3598, 0.3723, 0.3771]
   std: [0.2772, 0.2915, 0.3087]

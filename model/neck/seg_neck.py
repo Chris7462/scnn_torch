@@ -16,7 +16,7 @@ class SegNeck(nn.Module):
     def __init__(
         self,
         in_channels: int = 128,
-        out_channels: int = 5,
+        out_channels: int = 5
     ) -> None:
         super().__init__()
 

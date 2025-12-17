@@ -57,11 +57,10 @@ def build_dataloader(config: dict, image_set: str, transforms):
 
 def build_model(config: dict):
     """Build SCNN model."""
-    input_size = tuple(config['model']['input_size'])
-    ms_ks = config['model']['ms_ks']
-    pretrained = config['model']['pretrained']
-    model = SCNN(input_size=input_size, ms_ks=ms_ks, pretrained=pretrained)
-
+    model = SCNN(
+        ms_ks=config['model']['ms_ks'],
+        pretrained=config['model']['pretrained'],
+    )
     return model
 
 

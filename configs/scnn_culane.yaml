@@ -2,14 +2,13 @@
 
 # Model
 model:
-  input_size: [288, 800]  # [height, width]
   ms_ks: 9                # Message passing kernel size
   pretrained: true
 
 # Dataset
 dataset:
   root: data/CULane
-  resize_shape: [288, 800]  # [height, width]
+  resize_shape: [288, 800]  # [height, width] - preprocessing only, not model constraint
 
 # Dataloader
 dataloader:

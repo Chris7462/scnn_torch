@@ -13,33 +13,30 @@ dataset:
 
 # Dataloader
 dataloader:
-  batch_size: 8
-  num_workers: 4
+  batch_size: 8  # 32  if resources allow
+  num_workers: 4  # 20  for batch size 32
 
 # Training
 train:
-  max_iter: 90000
+  max_iter: 128000  # 32000 for batch size 32
 
 # Augmentation
 augmentation:
-  rotation: 2.0
-  horizontal_flip_prob: 0.5
-  color_jitter_prob: 0.5
-  motion_blur_prob: 0.2
+  rotation: 2.0  # Rotation theta in degrees (samples from [-theta/2, theta/2], always applied)
 
 # Optimizer
 optimizer:
   type: SGD
-  lr: 0.01
+  lr: 0.01  # 0.04 for batch size 32
   momentum: 0.9
-  weight_decay: 0.0001
+  weight_decay: 0.001
+  nesterov: true
 
 # Learning rate scheduler
 lr_scheduler:
-  mode: min
-  factor: 0.5
-  patience: 5
-  min_lr: 0.00001
+  power: 0.9
+  warmup: 800  # 200 for batch size 32
+  min_lr: 1.0e-20
 
 # Loss
 loss:
@@ -47,15 +44,19 @@ loss:
   exist_weight: 0.1
   background_weight: 0.4
 
-# Normalization (ImageNet)
+# Normalization (ImageNet statistics - for pretrain model)
 normalize:
-  mean: [0.3598, 0.3723, 0.3771]
-  std: [0.2772, 0.2915, 0.3087]
+  mean: [0.485, 0.456, 0.406]
+  std: [0.229, 0.224, 0.225]
+# Normalization (CULane dataset statistics - for training from scratch)
+# normalize:
+#   mean: [0.3598, 0.3723, 0.3771]
+#   std: [0.2772, 0.2915, 0.3087]
 
-# Checkpoints (validation happens before each checkpoint save)
+# Checkpoints (save checkpoint with validation every N iterations)
 checkpoint:
   save_dir: checkpoints
-  interval: 2000  # Save checkpoint (with validation) every N iterations
+  interval: 2000  # 500 for batch size 32
 
 # Logging
 logging:

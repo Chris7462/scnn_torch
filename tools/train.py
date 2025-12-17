@@ -2,14 +2,13 @@ import argparse
 
 import torch
 import torch.optim as optim
-from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.data import DataLoader
 
 from datasets import CULane
 from datasets.transforms import get_train_transforms, get_val_transforms
 from model import SCNN
 from model.loss import SCNNLoss
-from engine import Trainer
+from engine import Trainer, PolyLR
 from utils import load_config
 
 
@@ -29,16 +28,8 @@ def build_transforms(config: dict, is_train: bool = True):
     std = tuple(config['normalize']['std'])
 
     if is_train:
-        aug_cfg = config['augmentation']
-        return get_train_transforms(
-            resize_shape,
-            mean,
-            std,
-            rotation=aug_cfg['rotation'],
-            horizontal_flip_prob=aug_cfg['horizontal_flip_prob'],
-            color_jitter_prob=aug_cfg['color_jitter_prob'],
-            motion_blur_prob=aug_cfg['motion_blur_prob'],
-        )
+        rotation = config['augmentation']['rotation']
+        return get_train_transforms(resize_shape, mean, std, rotation=rotation)
     else:
         return get_val_transforms(resize_shape, mean, std)
 
@@ -48,7 +39,7 @@ def build_dataloader(config: dict, image_set: str, transforms):
     dataset = CULane(
         root=config['dataset']['root'],
         image_set=image_set,
-        transforms=transforms,
+        transforms=transforms
     )
 
     dataloader = DataLoader(
@@ -58,7 +49,7 @@ def build_dataloader(config: dict, image_set: str, transforms):
         num_workers=config['dataloader']['num_workers'],
         collate_fn=dataset.collate,
         pin_memory=True,
-        drop_last=(image_set == 'train'),
+        drop_last=(image_set == 'train')
     )
 
     return dataloader
@@ -83,21 +74,23 @@ def build_optimizer(config: dict, model):
         lr=optimizer_cfg['lr'],
         momentum=optimizer_cfg['momentum'],
         weight_decay=optimizer_cfg['weight_decay'],
+        nesterov=optimizer_cfg['nesterov']
     )
 
     return optimizer
 
 
 def build_lr_scheduler(config: dict, optimizer):
-    """Build learning rate scheduler."""
-    scheduler_cfg = config['lr_scheduler']
+    """Build PolyLR scheduler with warmup."""
+    max_iter = config['train']['max_iter']
+    lr_cfg = config['lr_scheduler']
 
-    scheduler = ReduceLROnPlateau(
+    scheduler = PolyLR(
         optimizer,
-        mode=scheduler_cfg['mode'],
-        factor=scheduler_cfg['factor'],
-        patience=scheduler_cfg['patience'],
-        min_lr=scheduler_cfg['min_lr'],
+        max_iter=max_iter,
+        power=lr_cfg.get('power', 0.9),
+        warmup=lr_cfg.get('warmup', 0),
+        min_lr=lr_cfg.get('min_lr', 1e-20),
     )
 
     return scheduler
@@ -110,7 +103,7 @@ def build_criterion(config: dict):
     criterion = SCNNLoss(
         seg_weight=loss_cfg['seg_weight'],
         exist_weight=loss_cfg['exist_weight'],
-        background_weight=loss_cfg['background_weight'],
+        background_weight=loss_cfg['background_weight']
     )
 
     return criterion
@@ -146,7 +139,12 @@ def main():
     optimizer = build_optimizer(config, model)
 
     # Build lr scheduler
+    print("Building PolyLR scheduler...")
     lr_scheduler = build_lr_scheduler(config, optimizer)
+    lr_cfg = config['lr_scheduler']
+    print(f"  Power: {lr_cfg.get('power', 0.9)}")
+    print(f"  Warmup: {lr_cfg.get('warmup', 0)} iterations")
+    print(f"  Initial LR: {optimizer.param_groups[0]['lr']:.6f}")
 
     # Build criterion
     criterion = build_criterion(config).to(device)
@@ -171,6 +169,7 @@ def main():
     print("\nStarting training...")
     print(f"  Max iterations: {config['train']['max_iter']}")
     print(f"  Checkpoint interval: {config['checkpoint']['interval']}")
+    print("=" * 60)
     trainer.train()
 
 

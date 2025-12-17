@@ -19,7 +19,7 @@ class SCNNNeck(nn.Module):
         in_channels: int = 512,
         mid_channels: int = 1024,
         out_channels: int = 128,
-        dilation: int = 4,
+        dilation: int = 4
     ) -> None:
         super().__init__()
 

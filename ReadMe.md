@@ -79,13 +79,26 @@ The training is iteration-based. Key settings in `configs/scnn_culane.yaml`:
 | Parameter | Value | Description |
 |-----------|-------|-------------|
 | `model.input_size` | [288, 800] | Input size [height, width] |
-| `train.max_iter` | 90000 | Total training iterations |
-| `checkpoint.interval` | 2000 | Validate and save checkpoint every N iterations |
+| `model.pretrained` | true | Use ImageNet pretrained VGG16 backbone |
+| `train.max_iter` | 25000 | Total training iterations |
+| `checkpoint.interval` | 1000 | Validate and save checkpoint every N iterations |
 | `logging.print_interval` | 100 | Print training metrics every N iterations |
-| `optimizer.lr` | 0.01 | Base learning rate |
-| `lr_scheduler.patience` | 5 | Reduce LR after N validations without improvement |
-| `lr_scheduler.factor` | 0.5 | LR reduction factor |
-| `lr_scheduler.min_lr` | 0.00001 | Minimum learning rate |
+| `optimizer.lr` | 0.04 | Learning rate (scaled for `batch_size=32`) |
+| `optimizer.weight_decay` | 0.001 | Weight decay |
+| `optimizer.nesterov` | true | Use Nesterov momentum |
+| `lr_scheduler.power` | 0.9 | Polynomial decay power |
+| `lr_scheduler.warmup` | 200 | Warmup iterations |
+
+**Note on batch size and learning rate scaling:**
+
+The original paper uses `batch_size=12` with `lr=0.01`. When changing batch size, scale learning rate proportionally:
+
+| Batch Size | Learning Rate | Max Iter | Warmup |
+|------------|---------------|----------|--------|
+| 128 | 0.16 | 8,000 | 50 |
+| 64 | 0.08 | 16,000 | 100 |
+| 32 | 0.04 | 32,000 | 200 |
+| 8 | 0.01 | 128,000 | 800 |
 
 ## Testing
 ```bash
@@ -122,46 +135,60 @@ Evaluation outputs:
 - Per-category results saved to `outputs/evaluate/out_<category>.txt`
 - Summary saved to `outputs/evaluate/summary_iou<threshold>.txt`
 
-### Evaluation Metrics
+## Results
 
-The evaluator computes precision, recall, and F1-measure for each category:
+Trained model on CULane dataset (IoU threshold: 0.5, lane width: 30):
 
-| Category | Description |
-|----------|-------------|
-| Normal | Normal driving conditions |
-| Crowd | Crowded traffic |
-| HLight | High light / glare |
-| Shadow | Shadows on road |
-| No line | Faded or missing lane markings |
-| Arrow | Arrow markings on road |
-| Curve | Curved lanes |
-| Cross | Crossroads (FP only, no GT lanes) |
-| Night | Nighttime driving |
+| Category | F1 | Precision | Recall | TP | FP | FN |
+|----------|------|-----------|--------|-------|-------|-------|
+| Normal | 0.8946 | 0.8963 | 0.8929 | 29268 | 3386 | 3509 |
+| Crowd | 0.6857 | 0.7020 | 0.6702 | 18767 | 7968 | 9236 |
+| HLight | 0.6213 | 0.6462 | 0.5982 | 1008 | 552 | 677 |
+| Shadow | 0.6662 | 0.6834 | 0.6499 | 1869 | 866 | 1007 |
+| No line | 0.4236 | 0.4519 | 0.3987 | 5590 | 6779 | 8431 |
+| Arrow | 0.8379 | 0.8459 | 0.8300 | 2641 | 481 | 541 |
+| Curve | 0.6422 | 0.6745 | 0.6128 | 804 | 388 | 508 |
+| Cross | N/A | N/A | N/A | 0 | 2618 | 0 |
+| Night | 0.6618 | 0.6769 | 0.6473 | 13612 | 6496 | 7418 |
+| **Overall** | **0.7164** | **0.7321** | **0.7013** | **73559** | **26916** | **31327** |
 
-### Note on Evaluation Results
-
-The Python evaluator may produce slightly different results (~0.1-0.5% F1) compared to the official C++ CULane evaluator. This is due to differences in spline interpolation algorithms:
-- C++ uses a custom cubic spline with TDMA solver
-- Python uses `scipy.splprep` (B-spline)
-
-The difference is minor and acceptable for most purposes.
+**Note:** Cross category only measures false positives (no ground truth lanes at crossroads).
 
 ## Project Structure
 ```
 ├── configs/              # Configuration files
+│   └── scnn_culane.yaml  # CULane training config
 ├── datasets/             # Dataset and transforms
+│   ├── __init__.py
+│   ├── culane.py         # CULane dataset class
+│   └── transforms.py     # Data augmentation transforms
 ├── model/                # Model architecture
+│   ├── __init__.py
 │   ├── backbone/         # VGG16 backbone
+│   │   └── vgg.py
 │   ├── neck/             # Channel reduction
+│   │   ├── scnn_neck.py  # 512→128 channel reduction
+│   │   └── seg_neck.py   # Dropout + 128→5 segmentation output
 │   ├── spatial/          # Message passing module
-│   ├── head/             # Segmentation and existence heads
-│   └── loss/             # Loss functions
+│   │   └── message_passing.py
+│   ├── head/             # Output heads
+│   │   ├── seg_head.py   # Segmentation head (8x upsample)
+│   │   └── exist_head.py # Lane existence head
+│   ├── loss/             # Loss functions
+│   │   └── scnn_loss.py  # Combined seg + exist loss
+│   └── net/              # Full network
+│       └── scnn.py       # SCNN model
 ├── engine/               # Training and evaluation
+│   ├── __init__.py
+│   ├── trainer.py        # Training loop
+│   ├── evaluator.py      # Inference and prediction saving
+│   └── poly_lr.py        # Polynomial LR scheduler with warmup
 ├── utils/                # Utilities
+│   ├── __init__.py
 │   ├── config.py         # Config loading
-│   ├── culane_eval.py    # CULane evaluation
-│   ├── data.py           # Data utilities
-│   ├── logger.py         # Training logger
+│   ├── culane_eval.py    # CULane evaluation metrics
+│   ├── data.py           # Data utilities (infinite loader)
+│   ├── logger.py         # Training logger with plots
 │   ├── metrics.py        # Metrics tracking
 │   ├── postprocessing.py # Lane coordinate extraction
 │   └── visualization.py  # Lane visualization
@@ -181,5 +208,6 @@ The difference is minor and acceptable for most purposes.
   year={2018}
 }
 ```
+
 ## Acknowledgement
-This repository is built on the [official implementation](https://github.com/XingangPan/SCNN).
+This repository is built based on the [official implementation](https://github.com/XingangPan/SCNN).

@@ -18,7 +18,7 @@ class SCNNLoss(nn.Module):
         self,
         seg_weight: float = 1.0,
         exist_weight: float = 0.1,
-        background_weight: float = 0.4,
+        background_weight: float = 0.4
     ) -> None:
         super().__init__()
 
@@ -37,7 +37,7 @@ class SCNNLoss(nn.Module):
         seg_pred: Tensor,
         exist_pred: Tensor,
         seg_gt: Tensor,
-        exist_gt: Tensor,
+        exist_gt: Tensor
     ) -> tuple[Tensor, Tensor, Tensor]:
         """
         Args:

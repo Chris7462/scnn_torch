@@ -17,13 +17,13 @@ class SegNeck(nn.Module):
         self,
         in_channels: int = 128,
         out_channels: int = 5,
-        dropout: float = 0.1,
+        dropout: float = 0.1
     ) -> None:
         super().__init__()
 
         self.layers = nn.Sequential(
             nn.Dropout2d(dropout),
-            nn.Conv2d(in_channels, out_channels, kernel_size=1),
+            nn.Conv2d(in_channels, out_channels, kernel_size=1)
         )
 
     def forward(self, x: Tensor) -> Tensor:

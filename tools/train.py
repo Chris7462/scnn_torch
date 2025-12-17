@@ -34,7 +34,6 @@ def build_transforms(config: dict, is_train: bool = True):
             mean=mean,
             std=std,
             rotation=aug_cfg['rotation'],
-            horizontal_flip_prob=aug_cfg['horizontal_flip_prob'],
             color_jitter_prob=aug_cfg['color_jitter_prob'],
             motion_blur_prob=aug_cfg['motion_blur_prob']
         )

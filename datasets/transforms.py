@@ -9,7 +9,6 @@ def get_train_transforms(
     mean: tuple[float, float, float],
     std: tuple[float, float, float],
     rotation: float = 2.0,
-    horizontal_flip_prob: float = 0.5,
     color_jitter_prob: float = 0.5,
     motion_blur_prob: float = 0.2,
 ) -> A.Compose:
@@ -21,7 +20,6 @@ def get_train_transforms(
         mean: Sequence of means for each channel
         std: Sequence of standard deviations for each channel
         rotation: Rotation theta in degrees (samples from [-theta/2, theta/2])
-        horizontal_flip_prob: Probability of horizontal flip
         color_jitter_prob: Probability of color jitter
         motion_blur_prob: Probability of motion blur
 
@@ -34,7 +32,6 @@ def get_train_transforms(
     return A.Compose([
         A.Resize(height=resize_shape[0], width=resize_shape[1], interpolation=cv2.INTER_CUBIC),
         A.Rotate(limit=rotation / 2, border_mode=0, p=1.0),
-        A.HorizontalFlip(p=horizontal_flip_prob),
         A.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1, p=color_jitter_prob),
         A.MotionBlur(blur_limit=7, p=motion_blur_prob),
         A.Normalize(mean=mean, std=std),

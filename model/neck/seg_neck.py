@@ -17,7 +17,7 @@ class SegNeck(nn.Module):
         self,
         in_channels: int = 128,
         out_channels: int = 5,
-        dropout: float = 0.1,
+        dropout: float = 0.1
     ) -> None:
         super().__init__()
 

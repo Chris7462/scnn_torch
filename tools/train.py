@@ -73,21 +73,24 @@ def build_optimizer(config: dict, model):
         model.parameters(),
         lr=optimizer_cfg['lr'],
         momentum=optimizer_cfg['momentum'],
-        weight_decay=optimizer_cfg['weight_decay']
+        weight_decay=optimizer_cfg['weight_decay'],
+        nesterov=optimizer_cfg['nesterov']
     )
 
     return optimizer
 
 
 def build_lr_scheduler(config: dict, optimizer):
-    """Build PolyLR scheduler."""
+    """Build PolyLR scheduler with warmup."""
     max_iter = config['train']['max_iter']
-    power = config['lr_scheduler']['power']
+    lr_cfg = config['lr_scheduler']
 
     scheduler = PolyLR(
         optimizer,
         max_iter=max_iter,
-        power=power
+        power=lr_cfg.get('power', 0.9),
+        warmup=lr_cfg.get('warmup', 0),
+        min_lr=lr_cfg.get('min_lr', 1e-20),
     )
 
     return scheduler
@@ -138,7 +141,9 @@ def main():
     # Build lr scheduler
     print("Building PolyLR scheduler...")
     lr_scheduler = build_lr_scheduler(config, optimizer)
-    print(f"  Power: {config['lr_scheduler'].get('power', 0.9)}")
+    lr_cfg = config['lr_scheduler']
+    print(f"  Power: {lr_cfg.get('power', 0.9)}")
+    print(f"  Warmup: {lr_cfg.get('warmup', 0)} iterations")
     print(f"  Initial LR: {optimizer.param_groups[0]['lr']:.6f}")
 
     # Build criterion

@@ -4,7 +4,7 @@
 model:
   input_size: [288, 800]  # [height, width]
   ms_ks: 9                # Message passing kernel size
-  pretrained: false
+  pretrained: true
 
 # Dataset
 dataset:
@@ -18,7 +18,7 @@ dataloader:
 
 # Training
 train:
-  max_iter: 90000
+  max_iter: 130000
 
 # Augmentation
 augmentation:
@@ -27,13 +27,16 @@ augmentation:
 # Optimizer
 optimizer:
   type: SGD
-  lr: 0.01
+  lr: 0.16
   momentum: 0.9
-  weight_decay: 0.0001
+  weight_decay: 0.001
+  nesterov: true
 
 # Learning rate scheduler
 lr_scheduler:
-  power: 0.9  # Polynomial decay power
+  power: 0.9
+  warmup: 800
+  min_lr: 1.0e-20
 
 # Loss
 loss:

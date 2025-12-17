@@ -1,3 +1,5 @@
+import math
+
 import torch.nn as nn
 from torch import Tensor
 
@@ -42,7 +44,7 @@ class SCNN(nn.Module):
         self,
         input_size: tuple[int, int] = (288, 800),
         ms_ks: int = 9,
-        pretrained: bool = True,
+        pretrained: bool = True
     ) -> None:
         """
         Args:
@@ -63,8 +65,7 @@ class SCNN(nn.Module):
         self.seg_head = SegHead(upsample_scale=8)
         self.exist_head = ExistHead(in_channels=5, input_height=feature_height, input_width=feature_width)
 
-        if not pretrained:
-            self._initialize_weights()
+        self._initialize_weights(pretrained)
 
     def forward(self, x: Tensor) -> tuple[Tensor, Tensor]:
         """
@@ -85,13 +86,29 @@ class SCNN(nn.Module):
 
         return seg_pred, exist_pred
 
-    def _initialize_weights(self) -> None:
+    def _initialize_weights(self, pretrained: bool) -> None:
         """
         Initialize model weights.
 
-        Applies:
-        - PyTorch's defaults are battle-tested
+        Args:
+            pretrained: If True, only initialize non-backbone weights.
+                       If False, initialize all weights.
         """
-        for m in self.modules():
-            if hasattr(m, "reset_parameters"):
+        for name, m in self.named_modules():
+            if pretrained and name.startswith('backbone'):
+                continue
+            if hasattr(m, 'reset_parameters'):
                 m.reset_parameters()
+
+        # Message passing uses custom initialization
+        #     std = sqrt(2 / (kw * dim * dim * 5))
+        # where dim = channels and kw = kernel_size.
+        self._initialize_message_passing()
+
+    def _initialize_message_passing(self) -> None:
+        """Initialize message passing convolutions with custom variance scaling."""
+        mp = self.message_passing
+        std = math.sqrt(2.0 / (mp.kernel_size * mp.channels * mp.channels * 5.0))
+
+        for conv in [mp.conv_down, mp.conv_up, mp.conv_right, mp.conv_left]:
+            conv.weight.data.normal_(0.0, std)

@@ -75,3 +75,25 @@ class PolyLR(LRScheduler):
             (base_lr - min_lr) * coeff + min_lr
             for base_lr, min_lr in zip(self.base_lrs, self.min_lrs)
         ]
+
+    def state_dict(self):
+        """
+        Save only training progress state, not hyperparameters.
+
+        This allows changing max_iter, power, warmup, etc. in config
+        when resuming training.
+        """
+        return {
+            'last_epoch': self.last_epoch,
+            '_step_count': self._step_count,
+        }
+
+    def load_state_dict(self, state_dict):
+        """
+        Restore only training progress, not hyperparameters.
+
+        Hyperparameters (max_iter, power, warmup, min_lrs) come from
+        the current config, allowing adjustments when resuming.
+        """
+        self.last_epoch = state_dict['last_epoch']
+        self._step_count = state_dict['_step_count']

@@ -39,7 +39,7 @@ def build_dataloader(config: dict, transforms):
     dataset = CULane(
         root=config['dataset']['root'],
         image_set='test',
-        transforms=transforms,
+        transforms=transforms
     )
 
     dataloader = DataLoader(
@@ -48,7 +48,7 @@ def build_dataloader(config: dict, transforms):
         shuffle=False,
         num_workers=config['dataloader']['num_workers'],
         collate_fn=dataset.collate,
-        pin_memory=True,
+        pin_memory=True
     )
 
     return dataloader
@@ -58,7 +58,7 @@ def build_model(config: dict):
     """Build SCNN model."""
     model = SCNN(
         ms_ks=config['model']['ms_ks'],
-        pretrained=False,
+        pretrained=False
     )
     return model
 
@@ -110,7 +110,7 @@ def main():
         config=config,
         device=device,
         visualize=args.visualize,
-        num_visualize=args.num_visualize,
+        num_visualize=args.num_visualize
     )
 
     # Run evaluation

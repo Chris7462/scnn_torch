@@ -12,6 +12,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 import torch
+import torch.nn.functional as F
 from torchvision import transforms
 from PIL import Image
 
@@ -101,7 +102,7 @@ def infer_single_image(
     device: torch.device,
     target_height: int = 288,
     thresh: float = 0.3
-) -> tuple[list, np.ndarray, tuple[int, int]]:
+) -> tuple[list, np.ndarray, np.ndarray, tuple[int, int]]:
     """
     Run inference on a single image.
 
@@ -114,6 +115,7 @@ def infer_single_image(
 
     Returns:
         lanes: List of lane coordinates in original image space
+        seg_pred: Segmentation probabilities (5, H, W)
         exist_pred: Lane existence probabilities (4,)
         original_size: Original image size (H, W)
     """
@@ -124,9 +126,12 @@ def infer_single_image(
     input_tensor, original_size, resized_size = preprocess_image(image, target_height)
     input_tensor = input_tensor.to(device)
 
-    # Inference (model returns probs in eval mode)
+    # Inference
     with torch.no_grad():
         seg_pred, exist_pred = model(input_tensor)
+
+        # Convert seg_pred logits to probabilities
+        seg_pred = F.softmax(seg_pred, dim=1)
 
     # Convert to numpy
     seg_pred = seg_pred.squeeze(0).cpu().numpy()
@@ -140,7 +145,7 @@ def infer_single_image(
         thresh=thresh,
     )
 
-    return lanes, exist_pred, original_size
+    return lanes, seg_pred, exist_pred, original_size
 
 
 def save_visualization(
@@ -210,7 +215,7 @@ def main():
     for image_path in image_paths:
         print(f"\nProcessing: {image_path}")
 
-        lanes, exist_pred, original_size = infer_single_image(
+        lanes, seg_pred, exist_pred, original_size = infer_single_image(
             model=model,
             image_path=str(image_path),
             device=device,
@@ -225,17 +230,6 @@ def main():
 
         # Save visualization
         if args.visualize:
-            # Re-run inference to get seg_pred for visualization
-            image = Image.open(image_path).convert('RGB')
-            input_tensor, _, _ = preprocess_image(image, args.target_height)
-            input_tensor = input_tensor.to(device)
-
-            with torch.no_grad():
-                seg_pred, exist_pred = model(input_tensor)
-
-            seg_pred = seg_pred.squeeze(0).cpu().numpy()
-            exist_pred = exist_pred.squeeze(0).cpu().numpy()
-
             vis_path = output_dir / f"{image_path.stem}_vis.png"
             save_visualization(str(image_path), seg_pred, exist_pred, str(vis_path))
             print(f"  Saved: {vis_path}")

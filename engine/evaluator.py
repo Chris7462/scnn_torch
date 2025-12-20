@@ -4,6 +4,7 @@ import cv2
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from utils import prob2lines, get_save_path
 from utils import visualize_lanes
@@ -75,8 +76,11 @@ class Evaluator:
                 img = sample['img'].to(self.device)
                 img_names = sample['img_name']
 
-                # Forward pass (model returns probs in eval mode)
+                # Forward pass
                 seg_pred, exist_pred = self.model(img)
+
+                # Convert seg_pred logits to probabilities
+                seg_pred = F.softmax(seg_pred, dim=1)
 
                 # Convert to numpy
                 seg_pred = seg_pred.cpu().numpy()
@@ -84,7 +88,11 @@ class Evaluator:
 
                 # Process each image in batch
                 for i in range(len(seg_pred)):
-                    self._process_prediction(seg_pred[i], exist_pred[i], img_names[i])
+                    self._save_prediction(seg_pred[i], exist_pred[i], img_names[i])
+
+                    if self.visualize and self.vis_count < self.num_visualize:
+                        self._save_visualization(seg_pred[i], exist_pred[i], img_names[i])
+                        self.vis_count += 1
 
                 # Print progress every 100 batches
                 if (batch_idx + 1) % 100 == 0:
@@ -95,14 +103,14 @@ class Evaluator:
             print(f"Visualizations saved to: {self.vis_dir}")
         return self.output_dir
 
-    def _process_prediction(
+    def _save_prediction(
         self,
         seg_pred: np.ndarray,
         exist_pred: np.ndarray,
         img_name: str,
     ) -> None:
         """
-        Process single prediction and save to file.
+        Save lane prediction to file.
 
         Args:
             seg_pred: Segmentation probabilities (5, H, W)
@@ -129,11 +137,6 @@ class Evaluator:
                 for (x, y) in lane:
                     f.write(f"{x} {y} ")
                 f.write("\n")
-
-        # Save visualization
-        if self.visualize and self.vis_count < self.num_visualize:
-            self._save_visualization(seg_pred, exist_pred, img_name)
-            self.vis_count += 1
 
     def _save_visualization(
         self,

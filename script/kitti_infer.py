@@ -61,7 +61,7 @@ def preprocess_image(
     target_height: int = 288,
     mean: tuple = (0.485, 0.456, 0.406),
     std: tuple = (0.229, 0.224, 0.225)
-) -> tuple[torch.Tensor, tuple[int, int], tuple[int, int]]:
+) -> tuple[torch.Tensor, tuple[int, int]]:
     """
     Preprocess image for inference.
 
@@ -74,7 +74,6 @@ def preprocess_image(
     Returns:
         input_tensor: Preprocessed tensor (1, 3, H, W)
         original_size: Original image size (H, W)
-        resized_size: Resized image size (H, W)
     """
     # Original size
     original_size = (image.height, image.width)
@@ -93,7 +92,7 @@ def preprocess_image(
     # Apply transform
     input_tensor = transform(image).unsqueeze(0)
 
-    return input_tensor, original_size, resized_size
+    return input_tensor, original_size
 
 
 def infer_single_image(
@@ -123,7 +122,7 @@ def infer_single_image(
     image = Image.open(image_path).convert('RGB')
 
     # Preprocess
-    input_tensor, original_size, resized_size = preprocess_image(image, target_height)
+    input_tensor, original_size = preprocess_image(image, target_height)
     input_tensor = input_tensor.to(device)
 
     # Inference
@@ -146,39 +145,6 @@ def infer_single_image(
     )
 
     return lanes, seg_pred, exist_pred, original_size
-
-
-def save_visualization(
-    image_path: str,
-    seg_pred: np.ndarray,
-    exist_pred: np.ndarray,
-    save_path: str
-) -> None:
-    """
-    Save visualization of lane predictions.
-
-    Args:
-        image_path: Path to original image
-        seg_pred: Segmentation probabilities (5, H, W)
-        exist_pred: Existence probabilities (4,)
-        save_path: Path to save visualization
-    """
-    # Load and resize image to match prediction size
-    img = cv2.imread(image_path, cv2.IMREAD_COLOR)
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-
-    pred_h, pred_w = seg_pred.shape[1], seg_pred.shape[2]
-    img_resized = cv2.resize(img, (pred_w, pred_h), interpolation=cv2.INTER_CUBIC)
-
-    # Generate overlay
-    img_overlay, _ = visualize_lanes(img_resized, seg_pred, exist_pred)
-
-    # Create side-by-side image
-    side_by_side = np.concatenate([img_resized, img_overlay], axis=0)
-
-    # Convert to BGR and save
-    side_by_side = cv2.cvtColor(side_by_side, cv2.COLOR_RGB2BGR)
-    cv2.imwrite(save_path, side_by_side)
 
 
 def main():
@@ -230,8 +196,23 @@ def main():
 
         # Save visualization
         if args.visualize:
+            # Load original image
+            img = cv2.imread(str(image_path), cv2.IMREAD_COLOR)
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            img_h, img_w = img.shape[:2]
+
+            # Resize seg_pred to match original image size
+            seg_pred_resized = np.zeros((seg_pred.shape[0], img_h, img_w), dtype=seg_pred.dtype)
+            for i in range(seg_pred.shape[0]):
+                seg_pred_resized[i] = cv2.resize(seg_pred[i], (img_w, img_h), interpolation=cv2.INTER_CUBIC)
+
+            # Generate overlay at original resolution
+            img_overlay, _ = visualize_lanes(img, seg_pred_resized, exist_pred)
+
+            # Save
+            img_overlay = cv2.cvtColor(img_overlay, cv2.COLOR_RGB2BGR)
             vis_path = output_dir / f"{image_path.stem}_vis.png"
-            save_visualization(str(image_path), seg_pred, exist_pred, str(vis_path))
+            cv2.imwrite(str(vis_path), img_overlay)
             print(f"  Saved: {vis_path}")
 
 

@@ -155,21 +155,20 @@ class Evaluator:
         # Load original image
         img = cv2.imread(img_name, cv2.IMREAD_COLOR)
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        img_h, img_w = img.shape[:2]
 
-        # Resize image to match prediction size
-        pred_h, pred_w = seg_pred.shape[1], seg_pred.shape[2]
-        img_resized = cv2.resize(img, (pred_w, pred_h), interpolation=cv2.INTER_CUBIC)
+        # Resize seg_pred to match original image size
+        seg_pred_resized = np.zeros((seg_pred.shape[0], img_h, img_w), dtype=seg_pred.dtype)
+        for i in range(seg_pred.shape[0]):
+            seg_pred_resized[i] = cv2.resize(seg_pred[i], (img_w, img_h), interpolation=cv2.INTER_CUBIC)
 
-        # Generate overlay
-        img_overlay, _ = visualize_lanes(img_resized, seg_pred, exist_pred)
-
-        # Create side-by-side image
-        side_by_side = np.concatenate([img_resized, img_overlay], axis=0)
+        # Generate overlay at original resolution
+        img_overlay, _ = visualize_lanes(img, seg_pred_resized, exist_pred)
 
         # Convert to BGR for saving
-        side_by_side = cv2.cvtColor(side_by_side, cv2.COLOR_RGB2BGR)
+        img_overlay = cv2.cvtColor(img_overlay, cv2.COLOR_RGB2BGR)
 
         # Save visualization
         save_path = get_save_path(img_name, self.vis_dir, '.jpg')
         save_path.parent.mkdir(parents=True, exist_ok=True)
-        cv2.imwrite(str(save_path), side_by_side)
+        cv2.imwrite(str(save_path), img_overlay)

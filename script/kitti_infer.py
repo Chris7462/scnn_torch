@@ -2,13 +2,15 @@
 Inference script for running SCNN on arbitrary images (e.g., KITTI).
 
 Usage:
-    python tools/infer.py --checkpoint checkpoints/best.pth --image path/to/image.png
-    python tools/infer.py --checkpoint checkpoints/best.pth --image_dir path/to/images/
+    python script/kitti_infer.py --checkpoint checkpoints/best.pth --image path/to/image.png
+    python script/kitti_infer.py --checkpoint checkpoints/best.pth --image_dir path/to/images/
 """
 
 import argparse
 from pathlib import Path
 
+import cv2
+import numpy as np
 import torch
 from torchvision import transforms
 from PIL import Image
@@ -56,8 +58,8 @@ def build_model(checkpoint_path: str, device: torch.device) -> SCNN:
 def preprocess_image(
     image: Image.Image,
     target_height: int = 288,
-    mean: tuple = (0.3598, 0.3723, 0.3771),
-    std: tuple = (0.2772, 0.2915, 0.3087),
+    mean: tuple = (0.485, 0.456, 0.406),
+    std: tuple = (0.229, 0.224, 0.225)
 ) -> tuple[torch.Tensor, tuple[int, int], tuple[int, int]]:
     """
     Preprocess image for inference.
@@ -98,8 +100,8 @@ def infer_single_image(
     image_path: str,
     device: torch.device,
     target_height: int = 288,
-    thresh: float = 0.3,
-) -> tuple[list, torch.Tensor, tuple[int, int]]:
+    thresh: float = 0.3
+) -> tuple[list, np.ndarray, tuple[int, int]]:
     """
     Run inference on a single image.
 
@@ -112,7 +114,7 @@ def infer_single_image(
 
     Returns:
         lanes: List of lane coordinates in original image space
-        exist_pred: Lane existence predictions
+        exist_pred: Lane existence probabilities (4,)
         original_size: Original image size (H, W)
     """
     # Load image
@@ -122,9 +124,13 @@ def infer_single_image(
     input_tensor, original_size, resized_size = preprocess_image(image, target_height)
     input_tensor = input_tensor.to(device)
 
-    # Inference
+    # Inference (model returns probs in eval mode)
     with torch.no_grad():
         seg_pred, exist_pred = model(input_tensor)
+
+    # Convert to numpy
+    seg_pred = seg_pred.squeeze(0).cpu().numpy()
+    exist_pred = exist_pred.squeeze(0).cpu().numpy()
 
     # Post-process: get lane coordinates in original image space
     lanes = prob2lines(
@@ -135,6 +141,39 @@ def infer_single_image(
     )
 
     return lanes, exist_pred, original_size
+
+
+def save_visualization(
+    image_path: str,
+    seg_pred: np.ndarray,
+    exist_pred: np.ndarray,
+    save_path: str
+) -> None:
+    """
+    Save visualization of lane predictions.
+
+    Args:
+        image_path: Path to original image
+        seg_pred: Segmentation probabilities (5, H, W)
+        exist_pred: Existence probabilities (4,)
+        save_path: Path to save visualization
+    """
+    # Load and resize image to match prediction size
+    img = cv2.imread(image_path, cv2.IMREAD_COLOR)
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+    pred_h, pred_w = seg_pred.shape[1], seg_pred.shape[2]
+    img_resized = cv2.resize(img, (pred_w, pred_h), interpolation=cv2.INTER_CUBIC)
+
+    # Generate overlay
+    img_overlay, _ = visualize_lanes(img_resized, seg_pred, exist_pred)
+
+    # Create side-by-side image
+    side_by_side = np.concatenate([img_resized, img_overlay], axis=0)
+
+    # Convert to BGR and save
+    side_by_side = cv2.cvtColor(side_by_side, cv2.COLOR_RGB2BGR)
+    cv2.imwrite(save_path, side_by_side)
 
 
 def main():
@@ -180,16 +219,25 @@ def main():
         )
 
         # Print results
-        exist_probs = torch.sigmoid(exist_pred).squeeze().cpu().numpy()
         print(f"  Original size: {original_size[1]} x {original_size[0]}")
-        print(f"  Lane existence: {[f'{p:.2f}' for p in exist_probs]}")
-        print(f"  Detected lanes: {len([l for l in lanes if len(l) > 0])}")
+        print(f"  Lane existence: {[f'{p:.2f}' for p in exist_pred]}")
+        print(f"  Detected lanes: {len(lanes)}")
 
         # Save visualization
         if args.visualize:
+            # Re-run inference to get seg_pred for visualization
             image = Image.open(image_path).convert('RGB')
+            input_tensor, _, _ = preprocess_image(image, args.target_height)
+            input_tensor = input_tensor.to(device)
+
+            with torch.no_grad():
+                seg_pred, exist_pred = model(input_tensor)
+
+            seg_pred = seg_pred.squeeze(0).cpu().numpy()
+            exist_pred = exist_pred.squeeze(0).cpu().numpy()
+
             vis_path = output_dir / f"{image_path.stem}_vis.png"
-            visualize_lanes(image, lanes, save_path=str(vis_path))
+            save_visualization(str(image_path), seg_pred, exist_pred, str(vis_path))
             print(f"  Saved: {vis_path}")
 
 

@@ -9,13 +9,13 @@ class ExistHead(nn.Module):
     Predicts whether each lane exists in the image.
 
     Architecture:
-        Softmax → AdaptiveAvgPool(18x50) → Flatten → FC(4500→128) → ReLU → FC(128→4)
+        Softmax → AdaptiveAvgPool(18x50) → Flatten → FC(4500→128) → ReLU → FC(128→4) → Sigmoid
 
     This head accepts any input spatial size due to AdaptiveAvgPool2d.
     The output size (18, 50) matches the CULane image with size of 288×800.
 
     Output:
-        4 logits, one for each lane (use BCEWithLogitsLoss for training)
+        4 probabilities, one for each lane (use BCELoss for training)
     """
 
     def __init__(
@@ -28,7 +28,7 @@ class ExistHead(nn.Module):
 
         self.pool = nn.Sequential(
             nn.Softmax(dim=1),
-            nn.AdaptiveAvgPool2d(pool_size),
+            nn.AdaptiveAvgPool2d(pool_size)
         )
 
         fc_input_features = in_channels * pool_size[0] * pool_size[1]
@@ -38,6 +38,7 @@ class ExistHead(nn.Module):
             nn.Linear(fc_input_features, 128),
             nn.ReLU(inplace=True),
             nn.Linear(128, num_lanes),
+            nn.Sigmoid()
         )
 
     def forward(self, x: Tensor) -> Tensor:
@@ -46,7 +47,7 @@ class ExistHead(nn.Module):
             x: Input tensor of shape (B, 5, H, W) - segmentation logits before upsampling
 
         Returns:
-            Existence logits of shape (B, 4)
+            Existence probabilities of shape (B, 4)
         """
         x = self.pool(x)
         x = self.fc(x)

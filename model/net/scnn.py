@@ -1,6 +1,7 @@
 import math
 
 import torch.nn as nn
+import torch.nn.functional as F
 from torch import Tensor
 
 from ..backbone import VGGBackbone
@@ -34,6 +35,15 @@ class SCNN(nn.Module):
             │                                  │
             ▼                                  ▼
         seg_pred ───── (B, 5, H, W)       exist_pred ───── (B, 4)
+
+    Output:
+        Training mode (self.training=True):
+            seg_pred: logits (B, 5, H, W)
+            exist_pred: probabilities (B, 4)
+
+        Eval mode (self.training=False):
+            seg_pred: probabilities (B, 5, H, W)
+            exist_pred: probabilities (B, 4)
 
     Note:
         Input H and W must be divisible by 8 (backbone stride).
@@ -72,8 +82,9 @@ class SCNN(nn.Module):
                H and W must be divisible by 8.
 
         Returns:
-            seg_pred: Segmentation logits of shape (B, 5, H, W)
-            exist_pred: Existence logits of shape (B, 4)
+            seg_pred: Segmentation output of shape (B, 5, H, W)
+                      Logits during training, probabilities during eval.
+            exist_pred: Existence probabilities of shape (B, 4)
         """
         x = self.backbone(x)
         x = self.scnn_neck(x)
@@ -82,6 +93,9 @@ class SCNN(nn.Module):
 
         seg_pred = self.seg_head(x)
         exist_pred = self.exist_head(x)
+
+        if not self.training:
+            seg_pred = F.softmax(seg_pred, dim=1)
 
         return seg_pred, exist_pred
 

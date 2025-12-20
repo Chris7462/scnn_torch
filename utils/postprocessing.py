@@ -45,24 +45,26 @@ def get_lane_coords(
 
 def prob2lines(
     seg_pred: np.ndarray,
-    exist: list[int],
+    exist: np.ndarray,
     resize_shape: tuple[int, int],
     smooth: bool = True,
     y_px_gap: int = 20,
     pts: int = 18,
     thresh: float = 0.3,
+    exist_thresh: float = 0.5
 ) -> list[list[tuple[int, int]]]:
     """
     Convert probability map to lane coordinates for CULane format.
 
     Args:
         seg_pred: Segmentation prediction (5, h, w)
-        exist: Lane existence list [0/1, 0/1, 0/1, 0/1]
+        exist: Lane existence probabilities (4,)
         resize_shape: Target shape (H, W)
         smooth: Whether to smooth the probability map
         y_px_gap: Y pixel gap for sampling
         pts: Number of points per lane
-        thresh: Probability threshold
+        thresh: Probability threshold for lane detection
+        exist_thresh: Probability threshold for lane existence
 
     Returns:
         List of lane coordinates, each lane is list of (x, y) tuples
@@ -74,7 +76,7 @@ def prob2lines(
     seg_pred = np.ascontiguousarray(np.transpose(seg_pred, (1, 2, 0)))
 
     for i in range(4):
-        if exist[i] == 0:
+        if exist[i] < exist_thresh:
             continue
 
         prob_map = seg_pred[..., i + 1]

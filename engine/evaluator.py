@@ -4,7 +4,6 @@ import cv2
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 from utils import prob2lines, get_save_path
 from utils import visualize_lanes
@@ -76,14 +75,12 @@ class Evaluator:
                 img = sample['img'].to(self.device)
                 img_names = sample['img_name']
 
-                # Forward pass
+                # Forward pass (model returns probs in eval mode)
                 seg_pred, exist_pred = self.model(img)
-                seg_pred = F.softmax(seg_pred, dim=1)
-                exist_pred = torch.sigmoid(exist_pred)
 
                 # Convert to numpy
-                seg_pred = seg_pred.detach().cpu().numpy()
-                exist_pred = exist_pred.detach().cpu().numpy()
+                seg_pred = seg_pred.cpu().numpy()
+                exist_pred = exist_pred.cpu().numpy()
 
                 # Process each image in batch
                 for i in range(len(seg_pred)):
@@ -108,15 +105,14 @@ class Evaluator:
         Process single prediction and save to file.
 
         Args:
-            seg_pred: Segmentation prediction (5, H, W)
-            exist_pred: Existence prediction (4,)
+            seg_pred: Segmentation probabilities (5, H, W)
+            exist_pred: Existence probabilities (4,)
             img_name: Original image path
         """
         # Get lane coordinates
-        exist = [1 if exist_pred[i] > 0.5 else 0 for i in range(4)]
         lane_coords = prob2lines(
             seg_pred,
-            exist,
+            exist_pred,
             self.resize_shape,
             y_px_gap=self.y_px_gap,
             pts=self.pts,
@@ -149,8 +145,8 @@ class Evaluator:
         Save visualization of prediction.
 
         Args:
-            seg_pred: Segmentation prediction (5, H, W)
-            exist_pred: Existence prediction (4,)
+            seg_pred: Segmentation probabilities (5, H, W)
+            exist_pred: Existence probabilities (4,)
             img_name: Original image path
         """
         # Load original image

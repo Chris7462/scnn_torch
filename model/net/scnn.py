@@ -14,26 +14,30 @@ class SCNN(nn.Module):
     Spatial CNN for lane detection.
 
     Architecture:
-        Input (B, 3, 288, 800)
+        Input (B, 3, H, W)       ← Any size divisible by 8
             │
             ▼
-        backbone ──────────────── (B, 512, 36, 100)
+        backbone ──────────────── (B, 512, H/8, W/8)
             │
             ▼
-        scnn_neck ─────────────── (B, 128, 36, 100)
+        scnn_neck ─────────────── (B, 128, H/8, W/8)
             │
             ▼
-        message_passing ───────── (B, 128, 36, 100)
+        message_passing ───────── (B, 128, H/8, W/8)
             │
             ▼
-        seg_neck ──────────────── (B, 5, 36, 100)    # shared features
+        seg_neck ──────────────── (B, 5, H/8, W/8)    # shared features
             │
             ├──────────────────────────────────┐
             ▼                                  ▼
         seg_head                          exist_head
             │                                  │
             ▼                                  ▼
-        seg_pred ───── (B,5,288,800)      exist_pred ───── (B, 4)
+        seg_pred ───── (B, 5, H, W)       exist_pred ───── (B, 4)
+
+    Note:
+        Input H and W must be divisible by 8 (backbone stride).
+        The model accepts any input size meeting this constraint.
 
     Reference:
         "Spatial As Deep: Spatial CNN for Traffic Scene Understanding"
@@ -42,28 +46,22 @@ class SCNN(nn.Module):
 
     def __init__(
         self,
-        input_size: tuple[int, int] = (288, 800),
         ms_ks: int = 9,
         pretrained: bool = True
     ) -> None:
         """
         Args:
-            input_size: (height, width) of input image
             ms_ks: Kernel size for message passing convolutions
             pretrained: Whether to use pretrained VGG16 backbone
         """
         super().__init__()
-
-        input_height, input_width = input_size
-        feature_height = input_height // 8
-        feature_width = input_width // 8
 
         self.backbone = VGGBackbone(pretrained=pretrained)
         self.scnn_neck = SCNNNeck(in_channels=512, mid_channels=1024, out_channels=128)
         self.message_passing = MessagePassing(channels=128, kernel_size=ms_ks)
         self.seg_neck = SegNeck(in_channels=128, out_channels=5)
         self.seg_head = SegHead(upsample_scale=8)
-        self.exist_head = ExistHead(in_channels=5, input_height=feature_height, input_width=feature_width)
+        self.exist_head = ExistHead(in_channels=5)
 
         self._initialize_weights(pretrained)
 
@@ -71,6 +69,7 @@ class SCNN(nn.Module):
         """
         Args:
             x: Input tensor of shape (B, 3, H, W)
+               H and W must be divisible by 8.
 
         Returns:
             seg_pred: Segmentation logits of shape (B, 5, H, W)

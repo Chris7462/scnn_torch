@@ -39,7 +39,7 @@ def build_dataloader(config: dict, transforms):
     dataset = CULane(
         root=config['dataset']['root'],
         image_set='test',
-        transforms=transforms,
+        transforms=transforms
     )
 
     dataloader = DataLoader(
@@ -48,7 +48,7 @@ def build_dataloader(config: dict, transforms):
         shuffle=False,
         num_workers=config['dataloader']['num_workers'],
         collate_fn=dataset.collate,
-        pin_memory=True,
+        pin_memory=True
     )
 
     return dataloader
@@ -56,10 +56,10 @@ def build_dataloader(config: dict, transforms):
 
 def build_model(config: dict):
     """Build SCNN model."""
-    input_size = tuple(config['model']['input_size'])
-    ms_ks = config['model']['ms_ks']
-    model = SCNN(input_size=input_size, ms_ks=ms_ks, pretrained=False)
-
+    model = SCNN(
+        ms_ks=config['model']['ms_ks'],
+        pretrained=False
+    )
     return model
 
 
@@ -110,7 +110,7 @@ def main():
         config=config,
         device=device,
         visualize=args.visualize,
-        num_visualize=args.num_visualize,
+        num_visualize=args.num_visualize
     )
 
     # Run evaluation
@@ -125,6 +125,7 @@ def main():
         print(f"Visualizations saved to: {output_dir}/visualizations")
     print(f"\nTo run official CULane evaluation:")
     print(f"python tools/evaluate.py --config configs/scnn_culane.yaml --pred_dir outputs/predictions")
+
 
 if __name__ == '__main__':
     main()

@@ -57,11 +57,10 @@ def build_dataloader(config: dict, image_set: str, transforms):
 
 def build_model(config: dict):
     """Build SCNN model."""
-    input_size = tuple(config['model']['input_size'])
-    ms_ks = config['model']['ms_ks']
-    pretrained = config['model']['pretrained']
-    model = SCNN(input_size=input_size, ms_ks=ms_ks, pretrained=pretrained)
-
+    model = SCNN(
+        ms_ks=config['model']['ms_ks'],
+        pretrained=config['model']['pretrained']
+    )
     return model
 
 
@@ -90,7 +89,7 @@ def build_lr_scheduler(config: dict, optimizer):
         max_iter=max_iter,
         power=lr_cfg.get('power', 0.9),
         warmup=lr_cfg.get('warmup', 0),
-        min_lr=lr_cfg.get('min_lr', 1e-20),
+        min_lr=lr_cfg.get('min_lr', 1e-20)
     )
 
     return scheduler
@@ -158,7 +157,7 @@ def main():
         optimizer=optimizer,
         lr_scheduler=lr_scheduler,
         config=config,
-        device=device,
+        device=device
     )
 
     # Resume from checkpoint if specified

@@ -2,14 +2,17 @@
 Inference script for running SCNN on arbitrary images (e.g., KITTI).
 
 Usage:
-    python tools/infer.py --checkpoint checkpoints/best.pth --image path/to/image.png
-    python tools/infer.py --checkpoint checkpoints/best.pth --image_dir path/to/images/
+    python script/kitti_infer.py --checkpoint checkpoints/best.pth --image path/to/image.png
+    python script/kitti_infer.py --checkpoint checkpoints/best.pth --image_dir path/to/images/
 """
 
 import argparse
 from pathlib import Path
 
+import cv2
+import numpy as np
 import torch
+import torch.nn.functional as F
 from torchvision import transforms
 from PIL import Image
 
@@ -56,9 +59,9 @@ def build_model(checkpoint_path: str, device: torch.device) -> SCNN:
 def preprocess_image(
     image: Image.Image,
     target_height: int = 288,
-    mean: tuple = (0.3598, 0.3723, 0.3771),
-    std: tuple = (0.2772, 0.2915, 0.3087),
-) -> tuple[torch.Tensor, tuple[int, int], tuple[int, int]]:
+    mean: tuple = (0.485, 0.456, 0.406),
+    std: tuple = (0.229, 0.224, 0.225)
+) -> tuple[torch.Tensor, tuple[int, int]]:
     """
     Preprocess image for inference.
 
@@ -71,7 +74,6 @@ def preprocess_image(
     Returns:
         input_tensor: Preprocessed tensor (1, 3, H, W)
         original_size: Original image size (H, W)
-        resized_size: Resized image size (H, W)
     """
     # Original size
     original_size = (image.height, image.width)
@@ -90,7 +92,7 @@ def preprocess_image(
     # Apply transform
     input_tensor = transform(image).unsqueeze(0)
 
-    return input_tensor, original_size, resized_size
+    return input_tensor, original_size
 
 
 def infer_single_image(
@@ -98,8 +100,8 @@ def infer_single_image(
     image_path: str,
     device: torch.device,
     target_height: int = 288,
-    thresh: float = 0.3,
-) -> tuple[list, torch.Tensor, tuple[int, int]]:
+    thresh: float = 0.3
+) -> tuple[list, np.ndarray, np.ndarray, tuple[int, int]]:
     """
     Run inference on a single image.
 
@@ -112,19 +114,27 @@ def infer_single_image(
 
     Returns:
         lanes: List of lane coordinates in original image space
-        exist_pred: Lane existence predictions
+        seg_pred: Segmentation probabilities (5, H, W)
+        exist_pred: Lane existence probabilities (4,)
         original_size: Original image size (H, W)
     """
     # Load image
     image = Image.open(image_path).convert('RGB')
 
     # Preprocess
-    input_tensor, original_size, resized_size = preprocess_image(image, target_height)
+    input_tensor, original_size = preprocess_image(image, target_height)
     input_tensor = input_tensor.to(device)
 
     # Inference
     with torch.no_grad():
         seg_pred, exist_pred = model(input_tensor)
+
+        # Convert seg_pred logits to probabilities
+        seg_pred = F.softmax(seg_pred, dim=1)
+
+    # Convert to numpy
+    seg_pred = seg_pred.squeeze(0).cpu().numpy()
+    exist_pred = exist_pred.squeeze(0).cpu().numpy()
 
     # Post-process: get lane coordinates in original image space
     lanes = prob2lines(
@@ -134,7 +144,7 @@ def infer_single_image(
         thresh=thresh,
     )
 
-    return lanes, exist_pred, original_size
+    return lanes, seg_pred, exist_pred, original_size
 
 
 def main():
@@ -171,7 +181,7 @@ def main():
     for image_path in image_paths:
         print(f"\nProcessing: {image_path}")
 
-        lanes, exist_pred, original_size = infer_single_image(
+        lanes, seg_pred, exist_pred, original_size = infer_single_image(
             model=model,
             image_path=str(image_path),
             device=device,
@@ -180,16 +190,29 @@ def main():
         )
 
         # Print results
-        exist_probs = torch.sigmoid(exist_pred).squeeze().cpu().numpy()
         print(f"  Original size: {original_size[1]} x {original_size[0]}")
-        print(f"  Lane existence: {[f'{p:.2f}' for p in exist_probs]}")
-        print(f"  Detected lanes: {len([l for l in lanes if len(l) > 0])}")
+        print(f"  Lane existence: {[f'{p:.2f}' for p in exist_pred]}")
+        print(f"  Detected lanes: {len(lanes)}")
 
         # Save visualization
         if args.visualize:
-            image = Image.open(image_path).convert('RGB')
+            # Load original image
+            img = cv2.imread(str(image_path), cv2.IMREAD_COLOR)
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            img_h, img_w = img.shape[:2]
+
+            # Resize seg_pred to match original image size
+            seg_pred_resized = np.zeros((seg_pred.shape[0], img_h, img_w), dtype=seg_pred.dtype)
+            for i in range(seg_pred.shape[0]):
+                seg_pred_resized[i] = cv2.resize(seg_pred[i], (img_w, img_h), interpolation=cv2.INTER_CUBIC)
+
+            # Generate overlay at original resolution
+            img_overlay, _ = visualize_lanes(img, seg_pred_resized, exist_pred)
+
+            # Save
+            img_overlay = cv2.cvtColor(img_overlay, cv2.COLOR_RGB2BGR)
             vis_path = output_dir / f"{image_path.stem}_vis.png"
-            visualize_lanes(image, lanes, save_path=str(vis_path))
+            cv2.imwrite(str(vis_path), img_overlay)
             print(f"  Saved: {vis_path}")
 
 

@@ -34,10 +34,7 @@ def visualize_lanes(
     lane_img = np.zeros_like(img)
 
     # Get lane mask from segmentation prediction
-    if len(seg_pred.shape) == 3:
-        coord_mask = np.argmax(seg_pred, axis=0)
-    else:
-        coord_mask = seg_pred
+    coord_mask = np.argmax(seg_pred, axis=0)
 
     # Draw each lane if it exists
     for i in range(4):

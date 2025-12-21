@@ -87,9 +87,9 @@ def build_lr_scheduler(config: dict, optimizer):
     scheduler = PolyLR(
         optimizer,
         max_iter=max_iter,
-        power=lr_cfg.get('power', 0.9),
-        warmup=lr_cfg.get('warmup', 0),
-        min_lr=lr_cfg.get('min_lr', 1e-20)
+        power=lr_cfg['power'],
+        warmup=lr_cfg['warmup'],
+        min_lr=lr_cfg['min_lr']
     )
 
     return scheduler
@@ -141,8 +141,8 @@ def main():
     print("Building PolyLR scheduler...")
     lr_scheduler = build_lr_scheduler(config, optimizer)
     lr_cfg = config['lr_scheduler']
-    print(f"  Power: {lr_cfg.get('power', 0.9)}")
-    print(f"  Warmup: {lr_cfg.get('warmup', 0)} iterations")
+    print(f"  Power: {lr_cfg['power']}")
+    print(f"  Warmup: {lr_cfg['warmup']} iterations")
     print(f"  Initial LR: {optimizer.param_groups[0]['lr']:.6f}")
 
     # Build criterion

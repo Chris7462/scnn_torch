@@ -17,7 +17,7 @@ from torchvision import transforms
 from PIL import Image
 
 from model import SCNN
-from utils import prob2lines
+from utils import prob2lines, resize_seg_pred
 from utils import visualize_lanes
 
 
@@ -114,7 +114,7 @@ def infer_single_image(
 
     Returns:
         lanes: List of lane coordinates in original image space
-        seg_pred: Segmentation probabilities (5, H, W)
+        seg_pred: Segmentation probabilities (5, H, W) at original size
         exist_pred: Lane existence probabilities (4,)
         original_size: Original image size (H, W)
     """
@@ -136,11 +136,13 @@ def infer_single_image(
     seg_pred = seg_pred.squeeze(0).cpu().numpy()
     exist_pred = exist_pred.squeeze(0).cpu().numpy()
 
-    # Post-process: get lane coordinates in original image space
+    # Resize seg_pred to original image size
+    seg_pred = resize_seg_pred(seg_pred, original_size)
+
+    # Post-process: get lane coordinates
     lanes = prob2lines(
         seg_pred=seg_pred,
         exist=exist_pred,
-        resize_shape=original_size,
         thresh=thresh,
     )
 
@@ -199,15 +201,9 @@ def main():
             # Load original image
             img = cv2.imread(str(image_path), cv2.IMREAD_COLOR)
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-            img_h, img_w = img.shape[:2]
 
-            # Resize seg_pred to match original image size
-            seg_pred_resized = np.zeros((seg_pred.shape[0], img_h, img_w), dtype=seg_pred.dtype)
-            for i in range(seg_pred.shape[0]):
-                seg_pred_resized[i] = cv2.resize(seg_pred[i], (img_w, img_h), interpolation=cv2.INTER_CUBIC)
-
-            # Generate overlay at original resolution
-            img_overlay, _ = visualize_lanes(img, seg_pred_resized, exist_pred)
+            # Generate overlay
+            img_overlay, _ = visualize_lanes(img, seg_pred, exist_pred)
 
             # Save
             img_overlay = cv2.cvtColor(img_overlay, cv2.COLOR_RGB2BGR)

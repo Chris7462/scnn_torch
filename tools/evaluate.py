@@ -42,10 +42,6 @@ def parse_args():
                         help='Directory to save evaluation results')
     parser.add_argument('--iou', type=float, default=None,
                         help='IoU threshold (default: from config)')
-    parser.add_argument('--width', type=int, default=None,
-                        help='Image width (default: from config)')
-    parser.add_argument('--height', type=int, default=None,
-                        help='Image height (default: from config)')
     parser.add_argument('--lane_width', type=int, default=None,
                         help='Lane width for drawing (default: from config)')
     return parser.parse_args()
@@ -65,8 +61,6 @@ def main():
 
     eval_cfg = config['evaluation']
     iou_thresh = args.iou if args.iou is not None else eval_cfg['iou_threshold']
-    height = args.height if args.height is not None else eval_cfg['resize_shape'][0]
-    width = args.width if args.width is not None else eval_cfg['resize_shape'][1]
     lane_width = args.lane_width if args.lane_width is not None else eval_cfg['lane_width']
 
     pred_dir = Path(args.pred_dir)
@@ -87,7 +81,6 @@ def main():
     print(f"Predictions:  {pred_dir}")
     print(f"Data dir:     {data_dir}")
     print(f"IoU thresh:   {iou_thresh}")
-    print(f"Image size:   {height}x{width}")
     print(f"Lane width:   {lane_width}")
     print("=" * 60)
 
@@ -108,8 +101,6 @@ def main():
             pred_dir=pred_dir,
             anno_dir=data_dir,
             list_file=list_path,
-            img_width=width,
-            img_height=height,
             iou_thresh=iou_thresh,
             lane_width=lane_width,
             verbose=False,

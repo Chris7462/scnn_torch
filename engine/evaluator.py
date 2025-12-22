@@ -51,13 +51,33 @@ class Evaluator:
 
         # Evaluation settings from config
         eval_cfg = config['evaluation']
-        self.resize_shape = tuple(eval_cfg['resize_shape'])  # (H, W)
         self.y_px_gap = eval_cfg['y_px_gap']
         self.pts = eval_cfg['pts']
         self.thresh = eval_cfg['thresh']
 
         # Visualization counter
         self.vis_count = 0
+
+    def _resize_seg_pred(
+        self,
+        seg_pred: np.ndarray,
+        target_size: tuple[int, int],
+    ) -> np.ndarray:
+        """
+        Resize segmentation prediction to target size.
+
+        Args:
+            seg_pred: Segmentation probabilities (5, H, W)
+            target_size: Target size (H, W)
+
+        Returns:
+            Resized segmentation probabilities (5, target_H, target_W)
+        """
+        target_h, target_w = target_size
+        resized = np.zeros((seg_pred.shape[0], target_h, target_w), dtype=seg_pred.dtype)
+        for i in range(seg_pred.shape[0]):
+            resized[i] = cv2.resize(seg_pred[i], (target_w, target_h), interpolation=cv2.INTER_CUBIC)
+        return resized
 
     def evaluate(self) -> Path:
         """
@@ -75,6 +95,7 @@ class Evaluator:
             for batch_idx, sample in enumerate(self.test_loader):
                 img = sample['img'].to(self.device)
                 img_names = sample['img_name']
+                original_sizes = sample['original_size']
 
                 # Forward pass
                 seg_pred, exist_pred = self.model(img)
@@ -88,10 +109,15 @@ class Evaluator:
 
                 # Process each image in batch
                 for i in range(len(seg_pred)):
-                    self._save_prediction(seg_pred[i], exist_pred[i], img_names[i])
+                    original_size = original_sizes[i]
+
+                    # Resize seg_pred to original image size
+                    seg_pred_resized = self._resize_seg_pred(seg_pred[i], original_size)
+
+                    self._save_prediction(seg_pred_resized, exist_pred[i], img_names[i])
 
                     if self.visualize and self.vis_count < self.num_visualize:
-                        self._save_visualization(seg_pred[i], exist_pred[i], img_names[i])
+                        self._save_visualization(seg_pred_resized, exist_pred[i], img_names[i])
                         self.vis_count += 1
 
                 # Print progress every 100 batches
@@ -113,15 +139,14 @@ class Evaluator:
         Save lane prediction to file.
 
         Args:
-            seg_pred: Segmentation probabilities (5, H, W)
+            seg_pred: Segmentation probabilities (5, H, W) at original image size
             exist_pred: Existence probabilities (4,)
             img_name: Original image path
         """
-        # Get lane coordinates
+        # Get lane coordinates (seg_pred is already at original size)
         lane_coords = prob2lines(
             seg_pred,
             exist_pred,
-            self.resize_shape,
             y_px_gap=self.y_px_gap,
             pts=self.pts,
             thresh=self.thresh,
@@ -148,22 +173,16 @@ class Evaluator:
         Save visualization of prediction.
 
         Args:
-            seg_pred: Segmentation probabilities (5, H, W)
+            seg_pred: Segmentation probabilities (5, H, W) at original image size
             exist_pred: Existence probabilities (4,)
             img_name: Original image path
         """
         # Load original image
         img = cv2.imread(img_name, cv2.IMREAD_COLOR)
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        img_h, img_w = img.shape[:2]
 
-        # Resize seg_pred to match original image size
-        seg_pred_resized = np.zeros((seg_pred.shape[0], img_h, img_w), dtype=seg_pred.dtype)
-        for i in range(seg_pred.shape[0]):
-            seg_pred_resized[i] = cv2.resize(seg_pred[i], (img_w, img_h), interpolation=cv2.INTER_CUBIC)
-
-        # Generate overlay at original resolution
-        img_overlay, _ = visualize_lanes(img, seg_pred_resized, exist_pred)
+        # Generate overlay (seg_pred is already at original size)
+        img_overlay, _ = visualize_lanes(img, seg_pred, exist_pred)
 
         # Convert to BGR for saving
         img_overlay = cv2.cvtColor(img_overlay, cv2.COLOR_RGB2BGR)

@@ -64,6 +64,9 @@ class CULane(Dataset):
         img = cv2.imread(self.img_list[idx], cv2.IMREAD_COLOR)
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
+        # Store original size before transforms
+        original_size = img.shape[:2]  # (H, W)
+
         if self.image_set != 'test':
             seg_label = cv2.imread(self.seg_label_list[idx], cv2.IMREAD_GRAYSCALE)
             exist = np.array(self.exist_list[idx], dtype=np.float32)
@@ -82,6 +85,7 @@ class CULane(Dataset):
             'seg_label': seg_label,
             'exist': exist,
             'img_name': self.img_list[idx],
+            'original_size': original_size,
         }
 
     def __len__(self) -> int:
@@ -100,11 +104,24 @@ class CULane(Dataset):
         """
         img = torch.stack([b['img'] for b in batch])
         img_name = [b['img_name'] for b in batch]
+        original_size = [b['original_size'] for b in batch]
 
         if batch[0]['seg_label'] is None:
-            return {'img': img, 'seg_label': None, 'exist': None, 'img_name': img_name}
+            return {
+                'img': img,
+                'seg_label': None,
+                'exist': None,
+                'img_name': img_name,
+                'original_size': original_size,
+            }
 
         seg_label = torch.stack([b['seg_label'] for b in batch])
         exist = torch.from_numpy(np.stack([b['exist'] for b in batch]))
 
-        return {'img': img, 'seg_label': seg_label, 'exist': exist, 'img_name': img_name}
+        return {
+            'img': img,
+            'seg_label': seg_label,
+            'exist': exist,
+            'img_name': img_name,
+            'original_size': original_size,
+        }

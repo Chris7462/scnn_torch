@@ -8,34 +8,31 @@ def get_lane_coords(
     prob_map: np.ndarray,
     y_px_gap: int,
     pts: int,
-    thresh: float,
-    resize_shape: tuple[int, int],
+    thresh: float
 ) -> np.ndarray:
     """
     Extract lane coordinates from probability map for CULane format.
 
     Args:
-        prob_map: Probability map for single lane (h, w)
+        prob_map: Probability map for single lane (H, W) at original image size
         y_px_gap: Y pixel gap for sampling
         pts: Number of points to sample per lane
         thresh: Probability threshold
-        resize_shape: Target shape (H, W)
 
     Returns:
         X coordinates bottom up every y_px_gap px, 0 for non-exist
     """
-    h, w = prob_map.shape
-    H, W = resize_shape
+    H, W = prob_map.shape
 
     coords = np.zeros(pts)
     for i in range(pts):
-        y = int(h - i * y_px_gap / H * h - 1)
+        y = H - 1 - i * y_px_gap
         if y < 0:
             break
         line = prob_map[y, :]
         idx = np.argmax(line)
         if line[idx] > thresh:
-            coords[i] = int(idx / w * W)
+            coords[i] = idx
 
     if (coords > 0).sum() < 2:
         coords = np.zeros(pts)
@@ -46,7 +43,6 @@ def get_lane_coords(
 def prob2lines(
     seg_pred: np.ndarray,
     exist: np.ndarray,
-    resize_shape: tuple[int, int],
     smooth: bool = True,
     y_px_gap: int = 20,
     pts: int = 18,
@@ -57,9 +53,8 @@ def prob2lines(
     Convert probability map to lane coordinates for CULane format.
 
     Args:
-        seg_pred: Segmentation prediction (5, h, w)
+        seg_pred: Segmentation prediction (5, H, W) at original image size
         exist: Lane existence probabilities (4,)
-        resize_shape: Target shape (H, W)
         smooth: Whether to smooth the probability map
         y_px_gap: Y pixel gap for sampling
         pts: Number of points per lane
@@ -69,7 +64,7 @@ def prob2lines(
     Returns:
         List of lane coordinates, each lane is list of (x, y) tuples
     """
-    H, W = resize_shape
+    H, W = seg_pred.shape[1], seg_pred.shape[2]
     coordinates = []
 
     # Transpose to (H, W, C) for easier processing
@@ -84,7 +79,7 @@ def prob2lines(
         if smooth:
             prob_map = cv2.blur(prob_map, (9, 9), borderType=cv2.BORDER_REPLICATE)
 
-        coords = get_lane_coords(prob_map, y_px_gap, pts, thresh, resize_shape)
+        coords = get_lane_coords(prob_map, y_px_gap, pts, thresh)
 
         if (coords > 0).sum() < 2:
             continue

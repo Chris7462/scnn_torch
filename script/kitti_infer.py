@@ -95,6 +95,27 @@ def preprocess_image(
     return input_tensor, original_size
 
 
+def resize_seg_pred(
+    seg_pred: np.ndarray,
+    target_size: tuple[int, int],
+) -> np.ndarray:
+    """
+    Resize segmentation prediction to target size.
+
+    Args:
+        seg_pred: Segmentation probabilities (5, H, W)
+        target_size: Target size (H, W)
+
+    Returns:
+        Resized segmentation probabilities (5, target_H, target_W)
+    """
+    target_h, target_w = target_size
+    resized = np.zeros((seg_pred.shape[0], target_h, target_w), dtype=seg_pred.dtype)
+    for i in range(seg_pred.shape[0]):
+        resized[i] = cv2.resize(seg_pred[i], (target_w, target_h), interpolation=cv2.INTER_CUBIC)
+    return resized
+
+
 def infer_single_image(
     model: SCNN,
     image_path: str,
@@ -114,7 +135,7 @@ def infer_single_image(
 
     Returns:
         lanes: List of lane coordinates in original image space
-        seg_pred: Segmentation probabilities (5, H, W)
+        seg_pred: Segmentation probabilities (5, H, W) at original size
         exist_pred: Lane existence probabilities (4,)
         original_size: Original image size (H, W)
     """
@@ -136,11 +157,13 @@ def infer_single_image(
     seg_pred = seg_pred.squeeze(0).cpu().numpy()
     exist_pred = exist_pred.squeeze(0).cpu().numpy()
 
-    # Post-process: get lane coordinates in original image space
+    # Resize seg_pred to original image size
+    seg_pred = resize_seg_pred(seg_pred, original_size)
+
+    # Post-process: get lane coordinates (seg_pred is now at original size)
     lanes = prob2lines(
         seg_pred=seg_pred,
         exist=exist_pred,
-        resize_shape=original_size,
         thresh=thresh,
     )
 
@@ -199,15 +222,9 @@ def main():
             # Load original image
             img = cv2.imread(str(image_path), cv2.IMREAD_COLOR)
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-            img_h, img_w = img.shape[:2]
 
-            # Resize seg_pred to match original image size
-            seg_pred_resized = np.zeros((seg_pred.shape[0], img_h, img_w), dtype=seg_pred.dtype)
-            for i in range(seg_pred.shape[0]):
-                seg_pred_resized[i] = cv2.resize(seg_pred[i], (img_w, img_h), interpolation=cv2.INTER_CUBIC)
-
-            # Generate overlay at original resolution
-            img_overlay, _ = visualize_lanes(img, seg_pred_resized, exist_pred)
+            # Generate overlay (seg_pred is already at original size)
+            img_overlay, _ = visualize_lanes(img, seg_pred, exist_pred)
 
             # Save
             img_overlay = cv2.cvtColor(img_overlay, cv2.COLOR_RGB2BGR)

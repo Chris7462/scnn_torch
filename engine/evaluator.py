@@ -73,8 +73,8 @@ class Evaluator:
         with torch.no_grad():
             for batch_idx, sample in enumerate(self.test_loader):
                 img = sample['img'].to(self.device)
-                img_names = sample['img_name']
-                original_sizes = sample['original_size']
+                img_name = sample['img_name']
+                original_size = sample['original_size']
 
                 # Forward pass
                 seg_pred, exist_pred = self.model(img)
@@ -88,15 +88,13 @@ class Evaluator:
 
                 # Process each image in batch
                 for i in range(len(seg_pred)):
-                    original_size = original_sizes[i]
-
                     # Resize seg_pred to original image size
-                    seg_pred_resized = resize_seg_pred(seg_pred[i], original_size)
+                    seg_pred_resized = resize_seg_pred(seg_pred[i], original_size[i])
 
-                    self._save_prediction(seg_pred_resized, exist_pred[i], img_names[i])
+                    self._save_prediction(seg_pred_resized, exist_pred[i], img_name[i])
 
                     if self.visualize and self.vis_count < self.num_visualize:
-                        self._save_visualization(seg_pred_resized, exist_pred[i], img_names[i])
+                        self._save_visualization(seg_pred_resized, exist_pred[i], img_name[i])
                         self.vis_count += 1
 
                 # Print progress every 100 batches
@@ -122,7 +120,7 @@ class Evaluator:
             exist_pred: Existence probabilities (4,)
             img_name: Original image path
         """
-        # Get lane coordinates (seg_pred is already at original size)
+        # Get lane coordinates
         lane_coords = prob2lines(
             seg_pred,
             exist_pred,
@@ -160,7 +158,7 @@ class Evaluator:
         img = cv2.imread(img_name, cv2.IMREAD_COLOR)
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-        # Generate overlay (seg_pred is already at original size)
+        # Generate overlay
         img_overlay, _ = visualize_lanes(img, seg_pred, exist_pred)
 
         # Convert to BGR for saving

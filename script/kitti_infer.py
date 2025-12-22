@@ -139,7 +139,7 @@ def infer_single_image(
     # Resize seg_pred to original image size
     seg_pred = resize_seg_pred(seg_pred, original_size)
 
-    # Post-process: get lane coordinates (seg_pred is now at original size)
+    # Post-process: get lane coordinates
     lanes = prob2lines(
         seg_pred=seg_pred,
         exist=exist_pred,
@@ -202,7 +202,7 @@ def main():
             img = cv2.imread(str(image_path), cv2.IMREAD_COLOR)
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-            # Generate overlay (seg_pred is already at original size)
+            # Generate overlay
             img_overlay, _ = visualize_lanes(img, seg_pred, exist_pred)
 
             # Save

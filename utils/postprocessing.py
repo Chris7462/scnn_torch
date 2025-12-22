@@ -4,6 +4,27 @@ import cv2
 import numpy as np
 
 
+def resize_seg_pred(
+    seg_pred: np.ndarray,
+    target_size: tuple[int, int],
+) -> np.ndarray:
+    """
+    Resize segmentation prediction to target size.
+
+    Args:
+        seg_pred: Segmentation probabilities (C, H, W)
+        target_size: Target size (H, W)
+
+    Returns:
+        Resized segmentation probabilities (C, target_H, target_W)
+    """
+    target_h, target_w = target_size
+    resized = np.zeros((seg_pred.shape[0], target_h, target_w), dtype=seg_pred.dtype)
+    for i in range(seg_pred.shape[0]):
+        resized[i] = cv2.resize(seg_pred[i], (target_w, target_h), interpolation=cv2.INTER_CUBIC)
+    return resized
+
+
 def get_lane_coords(
     prob_map: np.ndarray,
     y_px_gap: int,

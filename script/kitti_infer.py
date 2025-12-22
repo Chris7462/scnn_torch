@@ -17,7 +17,7 @@ from torchvision import transforms
 from PIL import Image
 
 from model import SCNN
-from utils import prob2lines
+from utils import prob2lines, resize_seg_pred
 from utils import visualize_lanes
 
 
@@ -93,27 +93,6 @@ def preprocess_image(
     input_tensor = transform(image).unsqueeze(0)
 
     return input_tensor, original_size
-
-
-def resize_seg_pred(
-    seg_pred: np.ndarray,
-    target_size: tuple[int, int],
-) -> np.ndarray:
-    """
-    Resize segmentation prediction to target size.
-
-    Args:
-        seg_pred: Segmentation probabilities (5, H, W)
-        target_size: Target size (H, W)
-
-    Returns:
-        Resized segmentation probabilities (5, target_H, target_W)
-    """
-    target_h, target_w = target_size
-    resized = np.zeros((seg_pred.shape[0], target_h, target_w), dtype=seg_pred.dtype)
-    for i in range(seg_pred.shape[0]):
-        resized[i] = cv2.resize(seg_pred[i], (target_w, target_h), interpolation=cv2.INTER_CUBIC)
-    return resized
 
 
 def infer_single_image(

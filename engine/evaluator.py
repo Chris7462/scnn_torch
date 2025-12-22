@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from utils import prob2lines, get_save_path
+from utils import prob2lines, get_save_path, resize_seg_pred
 from utils import visualize_lanes
 
 
@@ -58,27 +58,6 @@ class Evaluator:
         # Visualization counter
         self.vis_count = 0
 
-    def _resize_seg_pred(
-        self,
-        seg_pred: np.ndarray,
-        target_size: tuple[int, int],
-    ) -> np.ndarray:
-        """
-        Resize segmentation prediction to target size.
-
-        Args:
-            seg_pred: Segmentation probabilities (5, H, W)
-            target_size: Target size (H, W)
-
-        Returns:
-            Resized segmentation probabilities (5, target_H, target_W)
-        """
-        target_h, target_w = target_size
-        resized = np.zeros((seg_pred.shape[0], target_h, target_w), dtype=seg_pred.dtype)
-        for i in range(seg_pred.shape[0]):
-            resized[i] = cv2.resize(seg_pred[i], (target_w, target_h), interpolation=cv2.INTER_CUBIC)
-        return resized
-
     def evaluate(self) -> Path:
         """
         Run inference on test set and save predictions.
@@ -112,7 +91,7 @@ class Evaluator:
                     original_size = original_sizes[i]
 
                     # Resize seg_pred to original image size
-                    seg_pred_resized = self._resize_seg_pred(seg_pred[i], original_size)
+                    seg_pred_resized = resize_seg_pred(seg_pred[i], original_size)
 
                     self._save_prediction(seg_pred_resized, exist_pred[i], img_names[i])
 

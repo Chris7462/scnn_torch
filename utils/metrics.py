@@ -51,8 +51,8 @@ class Metrics:
             loss: Total loss value
             loss_seg: Segmentation loss value
             loss_exist: Existence loss value
-            seg_pred: Segmentation predictions (B, 5, H, W)
-            exist_pred: Existence probabilities (B, 4)
+            seg_pred: Segmentation logits (B, 5, H, W)
+            exist_pred: Existence logits (B, 4)
             seg_gt: Segmentation ground truth (B, H, W)
             exist_gt: Existence ground truth (B, 4)
         """
@@ -68,8 +68,8 @@ class Metrics:
             self.running_seg_correct += (seg_pred_class == seg_gt).sum().item()
             self.running_seg_pixels += seg_gt.numel()
 
-            # Existence accuracy (exist_pred is already probabilities)
-            exist_pred_binary = (exist_pred > 0.5).float()
+            # Existence accuracy (exist_pred is logits, threshold at 0)
+            exist_pred_binary = (exist_pred > 0).float()
             self.running_exist_correct += (exist_pred_binary == exist_gt).sum().item()
             self.running_exist_samples += exist_gt.numel()
 

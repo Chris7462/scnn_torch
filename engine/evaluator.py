@@ -79,8 +79,9 @@ class Evaluator:
                 # Forward pass
                 seg_pred, exist_pred = self.model(img)
 
-                # Convert seg_pred logits to probabilities
+                # Convert logits to probabilities
                 seg_pred = F.softmax(seg_pred, dim=1)
+                exist_pred = torch.sigmoid(exist_pred)
 
                 # Convert to numpy
                 seg_pred = seg_pred.cpu().numpy()

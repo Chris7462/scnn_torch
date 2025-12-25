@@ -129,8 +129,9 @@ def infer_single_image(
     with torch.no_grad():
         seg_pred, exist_pred = model(input_tensor)
 
-        # Convert seg_pred logits to probabilities
+        # Convert logits to probabilities
         seg_pred = F.softmax(seg_pred, dim=1)
+        exist_pred = torch.sigmoid(exist_pred)
 
     # Convert to numpy
     seg_pred = seg_pred.squeeze(0).cpu().numpy()

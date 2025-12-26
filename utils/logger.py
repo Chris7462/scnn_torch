@@ -1,7 +1,9 @@
 from pathlib import Path
+import os
 
 import matplotlib
-matplotlib.use('Agg')
+if not os.environ.get('DISPLAY') and not os.environ.get('WAYLAND_DISPLAY'):
+    matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 

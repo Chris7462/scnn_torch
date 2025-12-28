@@ -19,7 +19,7 @@ from tqdm import tqdm
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
 
-from datasets import CULane
+from scnn_torch.datasets import CULane
 
 
 def parse_args():

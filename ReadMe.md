@@ -3,8 +3,16 @@
 PyTorch implementation of [Spatial As Deep: Spatial CNN for Traffic Scene Understanding](https://arxiv.org/abs/1712.06080).
 
 ## Installation
+
+Install the package in development mode:
 ```bash
-pip install -r requirements.txt
+cd scnn_torch
+pip install -e .
+```
+
+For training, install with optional dependencies:
+```bash
+pip install -e .[train]
 ```
 
 ## Dataset
@@ -156,42 +164,45 @@ Trained model on CULane dataset (IoU threshold: 0.5, lane width: 30):
 
 ## Project Structure
 ```
+├── pyproject.toml        # Package configuration
 ├── configs/              # Configuration files
 │   └── scnn_culane.yaml  # CULane training config
-├── datasets/             # Dataset and transforms
+├── scnn_torch/           # Python package
 │   ├── __init__.py
-│   ├── culane.py         # CULane dataset class
-│   └── transforms.py     # Data augmentation transforms
-├── model/                # Model architecture
-│   ├── __init__.py
-│   ├── backbone/         # VGG16 backbone
-│   │   └── vgg.py
-│   ├── neck/             # Channel reduction
-│   │   ├── scnn_neck.py  # 512→128 channel reduction
-│   │   └── seg_neck.py   # Dropout + 128→5 segmentation output
-│   ├── spatial/          # Message passing module
-│   │   └── message_passing.py
-│   ├── head/             # Output heads
-│   │   ├── seg_head.py   # Segmentation head (8x upsample)
-│   │   └── exist_head.py # Lane existence head
-│   ├── loss/             # Loss functions
-│   │   └── scnn_loss.py  # Combined seg + exist loss
-│   └── net/              # Full network
-│       └── scnn.py       # SCNN model
-├── engine/               # Training and evaluation
-│   ├── __init__.py
-│   ├── trainer.py        # Training loop
-│   ├── evaluator.py      # Inference and prediction saving
-│   └── poly_lr.py        # Polynomial LR scheduler with warmup
-├── utils/                # Utilities
-│   ├── __init__.py
-│   ├── config.py         # Config loading
-│   ├── culane_eval.py    # CULane evaluation metrics
-│   ├── data.py           # Data utilities (infinite loader)
-│   ├── logger.py         # Training logger with plots
-│   ├── metrics.py        # Metrics tracking
-│   ├── postprocessing.py # Lane coordinate extraction
-│   └── visualization.py  # Lane visualization
+│   ├── datasets/         # Dataset and transforms
+│   │   ├── __init__.py
+│   │   ├── culane.py     # CULane dataset class
+│   │   └── transforms.py # Data augmentation transforms
+│   ├── model/            # Model architecture
+│   │   ├── __init__.py
+│   │   ├── backbone/     # VGG16 backbone
+│   │   │   └── vgg.py
+│   │   ├── neck/         # Channel reduction
+│   │   │   ├── scnn_neck.py  # 512→128 channel reduction
+│   │   │   └── seg_neck.py   # Dropout + 128→5 segmentation output
+│   │   ├── spatial/      # Message passing module
+│   │   │   └── message_passing.py
+│   │   ├── head/         # Output heads
+│   │   │   ├── seg_head.py   # Segmentation head (8x upsample)
+│   │   │   └── exist_head.py # Lane existence head
+│   │   ├── loss/         # Loss functions
+│   │   │   └── scnn_loss.py  # Combined seg + exist loss
+│   │   └── net/          # Full network
+│   │       └── scnn.py   # SCNN model
+│   ├── engine/           # Training and evaluation
+│   │   ├── __init__.py
+│   │   ├── trainer.py    # Training loop
+│   │   ├── evaluator.py  # Inference and prediction saving
+│   │   └── poly_lr.py    # Polynomial LR scheduler with warmup
+│   └── utils/            # Utilities
+│       ├── __init__.py
+│       ├── config.py     # Config loading
+│       ├── culane_eval.py    # CULane evaluation metrics
+│       ├── data.py       # Data utilities (infinite loader)
+│       ├── logger.py     # Training logger with plots
+│       ├── metrics.py    # Metrics tracking
+│       ├── postprocessing.py # Lane coordinate extraction
+│       └── visualization.py  # Lane visualization
 └── tools/                # Scripts
     ├── train.py          # Training script
     ├── test.py           # Testing script

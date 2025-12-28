@@ -6,8 +6,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from utils import prob2lines, get_save_path, resize_seg_pred
-from utils import visualize_lanes
+from ..utils import prob2lines, get_save_path, resize_seg_pred
+from ..utils import visualize_lanes
 
 
 class Evaluator:

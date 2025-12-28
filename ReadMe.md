@@ -3,8 +3,16 @@
 PyTorch implementation of [Spatial As Deep: Spatial CNN for Traffic Scene Understanding](https://arxiv.org/abs/1712.06080).
 
 ## Installation
+
+Install the package in development mode:
 ```bash
-pip install -r requirements.txt
+cd scnn_torch
+pip install -e .
+```
+
+For training, install with optional dependencies:
+```bash
+pip install -e .[train]
 ```
 
 ## Dataset

@@ -12,8 +12,8 @@ Usage:
 import argparse
 from pathlib import Path
 
-from utils.culane_eval import evaluate_culane
-from utils import load_config
+from scnn_torch.utils.culane_eval import evaluate_culane
+from scnn_torch.utils import load_config
 
 
 # CULane test categories

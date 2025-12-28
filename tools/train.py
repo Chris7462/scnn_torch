@@ -4,12 +4,12 @@ import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
-from datasets import CULane
-from datasets.transforms import get_train_transforms, get_val_transforms
-from model import SCNN
-from model.loss import SCNNLoss
-from engine import Trainer, PolyLR
-from utils import load_config
+from scnn_torch.datasets import CULane
+from scnn_torch.datasets.transforms import get_train_transforms, get_val_transforms
+from scnn_torch.model import SCNN
+from scnn_torch.model.loss import SCNNLoss
+from scnn_torch.engine import Trainer, PolyLR
+from scnn_torch.utils import load_config
 
 
 def parse_args():

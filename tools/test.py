@@ -3,11 +3,11 @@ import argparse
 import torch
 from torch.utils.data import DataLoader
 
-from datasets import CULane
-from datasets.transforms import get_val_transforms
-from model import SCNN
-from engine import Evaluator
-from utils import load_config
+from scnn_torch.datasets import CULane
+from scnn_torch.datasets.transforms import get_val_transforms
+from scnn_torch.model import SCNN
+from scnn_torch.engine import Evaluator
+from scnn_torch.utils import load_config
 
 
 def parse_args():

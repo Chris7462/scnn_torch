@@ -3,7 +3,7 @@ from pathlib import Path
 import torch
 import torch.nn as nn
 
-from utils import Logger, Metrics, infinite_loader
+from ..utils import Logger, Metrics, infinite_loader
 from .poly_lr import PolyLR
 
 

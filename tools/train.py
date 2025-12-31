@@ -9,7 +9,7 @@ from scnn_torch.datasets.transforms import get_train_transforms, get_val_transfo
 from scnn_torch.model import SCNN
 from scnn_torch.model.loss import SCNNLoss
 from scnn_torch.engine import Trainer, PolyLR
-from scnn_torch.utils import load_config
+from scnn_torch.utils import load_config, set_seed
 
 
 def parse_args():
@@ -114,6 +114,11 @@ def main():
     # Load config
     config = load_config(args.config)
     print(f"Loaded config from {args.config}")
+
+    # Set random seed for reproducibility
+    seed = config['train']['seed']
+    set_seed(seed)
+    print(f"Random seed: {seed}")
 
     # Device
     device = torch.accelerator.current_accelerator().type if torch.accelerator.is_available() else "cpu"

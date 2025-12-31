@@ -18,6 +18,7 @@ dataloader:
 # Training
 train:
   max_iter: 128000  # 32000 for batch size 32
+  seed: 42
 
 # Augmentation
 augmentation:

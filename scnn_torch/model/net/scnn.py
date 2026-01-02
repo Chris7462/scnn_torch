@@ -64,7 +64,7 @@ class SCNN(nn.Module):
         self.scnn_neck = SCNNNeck(in_channels=512, mid_channels=1024, out_channels=128)
         self.message_passing = MessagePassing(channels=128, kernel_size=ms_ks)
         self.seg_neck = SegNeck(in_channels=128, out_channels=5)
-        self.seg_head = SegHead(upsample_scale=8)
+        self.seg_head = SegHead(in_channels=5, num_stages=3)
         self.exist_head = ExistHead(in_channels=5, mid_channels=8, num_lanes=4)
 
         self._initialize_weights(pretrained)

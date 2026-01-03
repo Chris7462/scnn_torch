@@ -1,6 +1,48 @@
 # SCNN Lane Detection
 
-PyTorch implementation of [Spatial As Deep: Spatial CNN for Traffic Scene Understanding](https://arxiv.org/abs/1712.06080).
+PyTorch implementation of [Spatial As Deep: Spatial CNN for Traffic Scene Understanding](https://arxiv.org/abs/1712.06080) with modern architectural improvements.
+
+## Key Differences from Original Paper
+
+This implementation introduces several architectural improvements over the original SCNN:
+
+| Component | Original | This Implementation |
+|-----------|----------|---------------------|
+| **Segmentation Head** | Bilinear interpolation (8×) | FCN-style transposed convolutions (3-stage 2× upsample) |
+| **Existence Head** | AdaptiveAvgPool + FC layers (~580K params) | FCOS-style conv layers + GlobalMaxPool (~550 params) |
+| **ONNX Export** | Problematic (fixed input size) | Fully compatible (resolution-agnostic) |
+
+### Segmentation Head (FCN-style)
+
+The original uses fixed bilinear upsampling. We replace it with learnable transposed convolutions following the FCN methodology:
+
+```
+(5, H/8, W/8) → ConvT → BN → ReLU →
+(5, H/4, W/4) → ConvT → BN → ReLU →
+(5, H/2, W/2) → ConvT →
+(5, H, W)
+```
+
+Benefits:
+- Learnable upsampling adapts to lane structures
+- Uses kernel=4, stride=2, padding=1 to avoid checkerboard artifacts
+
+### Existence Head (FCOS-style)
+
+The original uses a large FC network with fixed spatial pooling. We replace it with convolutional layers inspired by FCOS detection heads:
+
+```
+Select lane channels (drop background) →
+Conv(4→8, 5×3, dilation=2×1) → BN → ReLU →
+Conv(8→4, 1×1) →
+GlobalMaxPool(1,1) → Flatten
+```
+
+Benefits:
+- Resolution-agnostic (works with any input size)
+- ONNX-exportable
+- 1000× fewer parameters (~550 vs ~580K)
+- 5×3 kernel with dilation of 2 (effective RF 9×3) captures vertical lane structure
 
 ## Installation
 
@@ -149,18 +191,46 @@ Trained model on CULane dataset (IoU threshold: 0.5, lane width: 30):
 
 | Category | F1 | Precision | Recall | TP | FP | FN |
 |----------|------|-----------|--------|-------|-------|-------|
-| Normal | 0.9028 | 0.9043 | 0.9012 | 29538 | 3125 | 3239 |
-| Crowd | 0.6980 | 0.7062 | 0.6900 | 19323 | 8040 | 8680 |
-| HLight | 0.6019 | 0.6138 | 0.5905 | 995 | 626 | 690 |
-| Shadow | 0.7051 | 0.7051 | 0.7051 | 2028 | 848 |848 |
-| No line | 0.4388 | 0.4583 | 0.4209 | 5902 | 6976 | 8119 |
-| Arrow | 0.8434 | 0.8570 | 0.8303 | 2642 | 441 | 540 |
-| Curve | 0.6609 | 0.7162 | 0.6136 | 805 | 319 | 507 |
-| Cross | N/A | N/A | N/A | 0 | 2551 | 0 |
-| Night | 0.6578 | 0.6719 | 0.6443 | 13550 | 6617 | 7480 |
-| **Overall** | **0.7237** | **0.7348** | **0.7130** | **74783** | **26992** | **30103** |
+| Normal | 0.9059 | 0.9045 | 0.9073 | 29739 | 3140 | 3038 |
+| Crowd | 0.7072 | 0.7115 | 0.7030 | 19685 | 7981 | 8318 |
+| HLight | 0.6194 | 0.6246 | 0.6142 | 1035 | 622 | 650 |
+| Shadow | 0.7013 | 0.6969 | 0.7058 | 2030 | 883 | 846 |
+| No line | 0.4461 | 0.4624 | 0.4309 | 6042 | 7026 | 7979 |
+| Arrow | 0.8567 | 0.8661 | 0.8476 | 2697 | 417 | 485 |
+| Curve | 0.6701 | 0.7067 | 0.6372 | 836 | 347 | 476 |
+| Cross | N/A | N/A | N/A | 0 | 3036 | 0 |
+| Night | 0.6711 | 0.6672 | 0.6750 | 14195 | 7081 | 6835 |
+| **Overall** | **0.7310** | **0.7350** | **0.7271** | **76259** | **27497** | **28627** |
 
 **Note:** Cross category only measures false positives (no ground truth lanes at crossroads).
+
+## Model Architecture
+
+```
+Input (B, 3, H, W)       ← Any size divisible by 8
+    │
+    ▼
+VGG16 Backbone ────────── (B, 512, H/8, W/8)
+    │
+    ▼
+SCNN Neck ─────────────── (B, 128, H/8, W/8)
+    │                     Conv(512→1024, 3×3, dilation=4) → BN → ReLU →
+    │                     Conv(1024→128, 1×1) → BN → ReLU
+    ▼
+Message Passing ───────── (B, 128, H/8, W/8)
+    │                     4-direction spatial propagation
+    ▼
+Seg Neck ──────────────── (B, 5, H/8, W/8)
+    │                     Dropout → Conv(128→5, 1×1)
+    │
+    ├──────────────────────────────────┐
+    ▼                                  ▼
+Seg Head (FCN)                    Exist Head (FCOS)
+    │                                  │
+    │ 3× TransposedConv                │ Conv(5×3, dilation=2) → MaxPool
+    ▼                                  ▼
+seg_pred (B, 5, H, W)            exist_pred (B, 4)
+```
 
 ## Project Structure
 ```
@@ -183,8 +253,8 @@ Trained model on CULane dataset (IoU threshold: 0.5, lane width: 30):
 │   │   ├── spatial/      # Message passing module
 │   │   │   └── message_passing.py
 │   │   ├── head/         # Output heads
-│   │   │   ├── seg_head.py   # Segmentation head (8x upsample)
-│   │   │   └── exist_head.py # Lane existence head
+│   │   │   ├── seg_head.py   # FCN-style upsampling (3-stage 2×)
+│   │   │   └── exist_head.py # FCOS-style conv + pooling
 │   │   ├── loss/         # Loss functions
 │   │   │   └── scnn_loss.py  # Combined seg + exist loss
 │   │   └── net/          # Full network
@@ -219,6 +289,3 @@ Trained model on CULane dataset (IoU threshold: 0.5, lane width: 30):
   year={2018}
 }
 ```
-
-## Acknowledgement
-This repository is built based on the [official implementation](https://github.com/XingangPan/SCNN).

@@ -6,48 +6,55 @@ class ExistHead(nn.Module):
     """
     Lane existence head for SCNN.
 
-    Predicts whether each lane exists in the image.
+    Predicts whether each lane exists in the image using spatial convolutions
+    followed by Global Max Pooling.
 
     Architecture:
-        Softmax → AdaptiveAvgPool(18x50) → Flatten → FC(4500→128) → ReLU → FC(128→4)
+        Select lane channels (drop background) →
+        Conv(num_lanes→hidden, 5×3, dilation=2×1) → BN → ReLU →
+        Conv(hidden→num_lanes, 1×1) →
+        GlobalMaxPool(1,1) → Flatten
 
-    This head accepts any input spatial size due to AdaptiveAvgPool2d.
-    The output size (18, 50) matches the CULane image with size of 288×800.
+    The tall dilated convolution (effective receptive field 9×3) captures
+    the vertical structure of lane markings, helping distinguish real lanes
+    from scattered noise.
+
 
     Output:
-        4 logits, one for each lane (use BCEWithLogitsLoss for training)
+        num_lanes logits, one for each lane (use BCEWithLogitsLoss for training)
     """
 
     def __init__(
         self,
         in_channels: int = 5,
-        pool_size: tuple[int, int] = (18, 50),
+        mid_channels: int = 8,
         num_lanes: int = 4
     ) -> None:
         super().__init__()
 
-        self.pool = nn.Sequential(
-            nn.Softmax(dim=1),
-            nn.AdaptiveAvgPool2d(pool_size)
-        )
+        self.in_channels = in_channels
 
-        fc_input_features = in_channels * pool_size[0] * pool_size[1]
-
-        self.fc = nn.Sequential(
-            nn.Flatten(),
-            nn.Linear(fc_input_features, 128),
+        # Tall dilated conv to capture vertical lane structure
+        # Kernel (5,3) with dilation (2,1) → effective receptive field (9,3)
+        self.conv = nn.Sequential(
+            nn.Conv2d(num_lanes, mid_channels, kernel_size=(5, 3), padding=(4, 1), dilation=(2, 1), bias=False),
+            nn.BatchNorm2d(mid_channels),
             nn.ReLU(inplace=True),
-            nn.Linear(128, num_lanes)
+            nn.Conv2d(mid_channels, num_lanes, kernel_size=1),
         )
+        self.pool = nn.AdaptiveMaxPool2d(1)
 
     def forward(self, x: Tensor) -> Tensor:
         """
         Args:
-            x: Input tensor of shape (B, 5, H, W) - segmentation logits before upsampling
+            x: Input tensor of shape (B, in_channels, H, W) - segmentation logits before upsampling
+               Channel 0: background
+               Channel 1-num_lanes: lane 1-num_lanes
 
         Returns:
-            Existence logits of shape (B, 4)
+            Existence logits of shape (B, num_lanes)
         """
-        x = self.pool(x)
-        x = self.fc(x)
-        return x
+        x = x[:, 1:self.in_channels, :, :]  # Drop background, keep lanes: (B, num_lanes, H, W)
+        x = self.conv(x)                     # (B, num_lanes, H, W) - spatially filtered
+        x = self.pool(x)                     # (B, num_lanes, 1, 1)
+        return x.flatten(1)                  # (B, num_lanes)

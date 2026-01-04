@@ -18,6 +18,7 @@
 *.pdf
 *.pt
 *.pth
+*.egg-info
 
 # Ignore build, devel, and logs folder
 data

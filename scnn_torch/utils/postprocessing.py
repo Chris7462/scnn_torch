@@ -4,10 +4,7 @@ import cv2
 import numpy as np
 
 
-def resize_seg_pred(
-    seg_pred: np.ndarray,
-    target_size: tuple[int, int],
-) -> np.ndarray:
+def resize_seg_pred(seg_pred: np.ndarray, target_size: tuple[int, int]) -> np.ndarray:
     """
     Resize segmentation prediction to target size.
 
@@ -19,18 +16,16 @@ def resize_seg_pred(
         Resized segmentation probabilities (C, target_H, target_W)
     """
     target_h, target_w = target_size
-    resized = np.zeros((seg_pred.shape[0], target_h, target_w), dtype=seg_pred.dtype)
-    for i in range(seg_pred.shape[0]):
+    num_classes = seg_pred.shape[0]
+    resized = np.zeros((num_classes, target_h, target_w), dtype=seg_pred.dtype)
+
+    for i in range(num_classes):
         resized[i] = cv2.resize(seg_pred[i], (target_w, target_h), interpolation=cv2.INTER_CUBIC)
+
     return resized
 
 
-def get_lane_coords(
-    prob_map: np.ndarray,
-    y_px_gap: int,
-    pts: int,
-    thresh: float
-) -> np.ndarray:
+def get_lane_coords(prob_map: np.ndarray, y_px_gap: int, pts: int, thresh: float) -> np.ndarray:
     """
     Extract lane coordinates from probability map for CULane format.
 

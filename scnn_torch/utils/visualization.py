@@ -45,20 +45,3 @@ def visualize_lanes(
     img_overlay = cv2.addWeighted(src1=lane_img, alpha=0.8, src2=img, beta=1.0, gamma=0.0)
 
     return img_overlay, lane_img
-
-
-def add_exist_text(img: np.ndarray, exist_pred: np.ndarray) -> np.ndarray:
-    """
-    Add existence prediction probabilities to image.
-
-    Args:
-        img: Image to draw on (H, W, 3)
-        exist_pred: Existence prediction (4,) probabilities
-
-    Returns:
-        Image with text overlay
-    """
-    img = img.copy()
-    exist_probs = [f"{p:.2f}" for p in exist_pred]
-    cv2.putText(img, f"{exist_probs}", (20, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
-    return img

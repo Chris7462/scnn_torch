@@ -7,7 +7,7 @@ name = "scnn_torch"
 version = "0.1.0"
 description = "SCNN Lane Detection in PyTorch"
 readme = "ReadMe.md"
-license = {text = "MIT"}
+license = "MIT"
 authors = [
     {name = "chris7462", email = "chris7462@gmail.com"}
 ]
@@ -17,12 +17,12 @@ dependencies = [
     "torchvision",
     "numpy",
     "opencv-python",
+    "pyyaml",
 ]
 
 [project.optional-dependencies]
 train = [
     "albumentations",
-    "pyyaml",
     "matplotlib",
     "scipy",
 ]

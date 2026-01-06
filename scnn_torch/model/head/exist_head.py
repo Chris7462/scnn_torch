@@ -12,13 +12,13 @@ class ExistHead(nn.Module):
     Architecture:
         Select lane channels (drop background) →
         Conv(num_lanes→mid, 5×3, dilation=2×1) → GN → ReLU →
-        Conv(mid→mid, 3×3) → GN → ReLU →
+        Conv(mid→mid, 5×3, dilation=2×1) → GN → ReLU →
         Conv(mid→num_lanes, 1×1) →
         GlobalMaxPool(1,1) → Flatten
 
     Uses GroupNorm instead of BatchNorm for stability with small effective
-    batch sizes (4 lanes per image). The tall dilated convolution
-    (effective receptive field 9×3) captures vertical lane structure.
+    batch sizes (4 lanes per image). Both conv layers use tall dilated kernels
+    (effective receptive field 9×3 each) to capture vertical lane structure.
 
     Output:
         num_lanes logits, one for each lane (use BCEWithLogitsLoss for training)
@@ -36,6 +36,7 @@ class ExistHead(nn.Module):
         self.in_channels = in_channels
 
         # 3-layer conv with GroupNorm for stable training
+        # Both spatial layers use tall dilated kernels for vertical lane detection
         self.conv = nn.Sequential(
             # Layer 1: Tall dilated conv to capture vertical lane structure
             # Kernel (5,3) with dilation (2,1) → effective receptive field (9,3)
@@ -43,8 +44,9 @@ class ExistHead(nn.Module):
             nn.GroupNorm(num_groups, mid_channels),
             nn.ReLU(inplace=True),
 
-            # Layer 2: Regular conv for feature refinement
-            nn.Conv2d(mid_channels, mid_channels, kernel_size=3, padding=1, bias=False),
+            # Layer 2: Another tall dilated conv for deeper vertical feature extraction
+            # Kernel (5,3) with dilation (2,1) → effective receptive field (9,3)
+            nn.Conv2d(mid_channels, mid_channels, kernel_size=(5, 3), padding=(4, 1), dilation=(2, 1), bias=False),
             nn.GroupNorm(num_groups, mid_channels),
             nn.ReLU(inplace=True),
 
